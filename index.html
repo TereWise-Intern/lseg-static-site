@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S&P 500 報酬與波動排名</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", "Microsoft JhengHei", sans-serif; margin: 0; background:#0f1115; color:#e4e6eb; }
+  header { padding: 14px 20px; border-bottom: 1px solid #2a2f3a; background:#161922; position: sticky; top:0; z-index: 10; display:flex; align-items:baseline; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+  h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  .meta { font-size: 16px; color:#dbe2f5; font-weight:500; }
+  .meta .hl { color:#4a7cff; font-weight:600; }
+  nav { display:flex; gap:8px; align-items:center; }
+  nav a { padding:6px 10px; border:1px solid #2a2f3a; border-radius:4px; background:#1c2030; color:#9db7ff; text-decoration:none; font-size:13px; }
+  nav a.active { background:#2d4a8a; border-color:#4a7cff; color:#fff; }
+  .controls { padding: 12px 20px; border-bottom: 1px solid #2a2f3a; background:#13161e; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .controls label { font-size: 12px; color:#a8b0c2; display:flex; align-items:center; gap:4px; }
+  input, select, button { background:#1c2030; color:#e4e6eb; border:1px solid #2a2f3a; padding:6px 10px; border-radius:4px; font-size:13px; }
+  input:focus, select:focus { outline:none; border-color:#4a7cff; }
+  button { cursor:pointer; }
+  button:hover { background:#252b3d; }
+  .col-toggle { display:flex; flex-wrap:wrap; gap:4px; padding: 8px 20px; background:#13161e; border-bottom:1px solid #2a2f3a; }
+  .col-toggle .chip { font-size:11px; padding:3px 8px; border-radius:12px; border:1px solid #2a2f3a; background:#1c2030; cursor:pointer; user-select:none; }
+  .col-toggle .chip.on { background:#2d4a8a; border-color:#4a7cff; color:#fff; }
+  .table-wrap { overflow:auto; max-height: calc(100vh - 200px); }
+  table { width:100%; border-collapse: collapse; font-size: 13px; }
+  thead th { position: sticky; top:0; background:#1c2030; padding: 8px 10px; text-align:left; border-bottom:1px solid #2a2f3a; cursor:pointer; user-select:none; white-space: nowrap; }
+  thead th:hover { background:#252b3d; }
+  thead th.sorted-asc::after { content:" ▲"; color:#4a7cff; }
+  thead th.sorted-desc::after { content:" ▼"; color:#4a7cff; }
+  tbody td { padding: 6px 10px; border-bottom: 1px solid #1f2330; white-space: nowrap; }
+  tbody tr:hover { background:#181c28; }
+  tbody tr.top { background: rgba(74, 124, 255, 0.08); }
+  tr.group-row { background:#222838; cursor:pointer; user-select:none; }
+  tr.group-row:hover { background:#2a3148; }
+  tr.group-row td { padding: 8px 10px; font-weight:600; color:#dbe2f5; border-bottom:1px solid #2a2f3a; }
+  .group-stats { font-weight:400; color:#9ba6c4; font-size:12px; margin-left:8px; }
+  .arrow { display:inline-block; width:14px; transition: transform .15s; }
+  .arrow.collapsed { transform: rotate(-90deg); }
+  .pos { color:#3fcf8e; }
+  .neg { color:#ff5f6d; }
+  .num { text-align:right; font-variant-numeric: tabular-nums; }
+  .footer { padding: 8px 20px; font-size:11px; color:#6b7185; border-top:1px solid #2a2f3a; }
+  .toggle-btn.active { background:#2d4a8a; border-color:#4a7cff; color:#fff; }
+
+  #cardWrap { display:none; padding: 8px 12px; max-height: calc(100vh - 240px); overflow-y:auto; }
+  .card { background:#161922; border:1px solid #2a2f3a; border-radius:8px; padding:10px 12px; margin-bottom:8px; }
+  .card.top { border-color:#4a7cff; background: rgba(74,124,255,0.08); }
+  .card-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; gap:8px; }
+  .card-title { font-size:15px; font-weight:600; color:#e4e6eb; }
+  .card-sub { font-size:11px; color:#8b93a7; margin-top:2px; }
+  .card-rank { font-size:11px; color:#4a7cff; font-weight:600; white-space:nowrap; }
+  .card-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:4px 12px; font-size:12px; }
+  .card-grid .lbl { color:#8b93a7; }
+  .card-grid .val { text-align:right; font-variant-numeric: tabular-nums; }
+  .card-more { display:none; margin-top:6px; padding-top:6px; border-top:1px dashed #2a2f3a; }
+  .card.expanded .card-more { display:block; }
+  .card-toggle { font-size:11px; color:#4a7cff; cursor:pointer; margin-top:4px; user-select:none; text-align:center; }
+  .card-group { background:#222838; padding:8px 12px; margin: 8px -4px; border-radius:6px; font-weight:600; color:#dbe2f5; cursor:pointer; }
+  .card-group .stats { font-weight:400; color:#9ba6c4; font-size:11px; display:block; margin-top:2px; }
+
+  @media (max-width: 768px) {
+    header { padding: 10px 14px; }
+    h1 { font-size: 15px; }
+    .meta { font-size: 13px; }
+    .controls { padding: 8px 12px; gap: 8px; }
+    .controls input, .controls select, .controls button { font-size: 12px; padding: 5px 8px; }
+    .controls label { font-size: 11px; flex-wrap: wrap; }
+    .col-toggle { display: none; }  /* 手機隱藏欄位開關，省空間 */
+    .table-wrap { max-height: calc(100vh - 180px); -webkit-overflow-scrolling: touch; }
+    table { font-size: 11px; }
+    thead th { padding: 6px 8px; font-size: 11px; }
+    tbody td { padding: 5px 8px; }
+    /* 前兩欄 sticky（RIC、中文名）滑動時固定 */
+    thead th:nth-child(1), thead th:nth-child(2),
+    tbody td:nth-child(1), tbody td:nth-child(2) {
+      position: sticky; left: 0; background:#1c2030; z-index: 2;
+    }
+    thead th:nth-child(2), tbody td:nth-child(2) { left: 56px; }
+    tbody td:nth-child(1), tbody td:nth-child(2) { background:#0f1115; }
+    tbody tr:hover td:nth-child(1), tbody tr:hover td:nth-child(2) { background:#181c28; }
+    tbody tr.top td:nth-child(1), tbody tr.top td:nth-child(2) { background: rgba(74, 124, 255, 0.18); }
+    .footer { font-size: 10px; padding: 6px 12px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>S&amp;P 500 報酬與波動排名</h1>
+  <nav>
+    <a class="active" href="index.html">排名頁</a>
+    <a href="hsp.html">HSP</a>
+  </nav>
+  <div class="meta" id="meta"></div>
+</header>
+
+<div class="controls">
+  <input id="search" type="text" placeholder="搜尋 RIC / 公司名" style="width:200px;">
+  <label>市值前 <input id="mcapTop" type="number" value="100" min="0" max="1000" style="width:70px;"> 名（0=全部）</label>
+  <label>排序：<select id="sortCol"></select></label>
+  <select id="sortDir"><option value="desc">由大到小</option><option value="asc">由小到大</option></select>
+  <label>高亮前 <input id="topN" type="number" value="10" min="0" max="500" style="width:60px;"> 名</label>
+  <button id="groupBtn" class="toggle-btn">產業分組</button>
+  <button id="expandAllBtn">全展開</button>
+  <button id="collapseAllBtn">全收合</button>
+  <button id="exportBtn">匯出 CSV</button>
+  <span style="color:#8b93a7;font-size:12px;" id="count"></span>
+</div>
+
+<div class="col-toggle" id="colToggle"></div>
+
+<div class="table-wrap">
+  <table id="tbl">
+    <thead><tr id="thead"></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<div id="cardWrap"></div>
+
+<div class="footer">資料來源：LSEG / 報酬與波動為 adj_close 計算，波動已年化 (×√252)｜vol_ratio = vol_5 / vol_60｜市值單位：百萬美元</div>
+
+<script>
+let DATA = [];
+let DATA_DATE = null;
+
+const COLS = [
+  {key:'mcap_rank',    label:'市值名次',          type:'num',  fmt:v=>v==null?'-':'#'+v, defaultVis:false},
+  {key:'ric',          label:'RIC',               type:'str',  fmt:v=>v, defaultVis:true},
+  {key:'name_zh',      label:'公司',              type:'str',  fmt:v=>v||'-', defaultVis:true},
+  {key:'company_name', label:'英文名',            type:'str',  fmt:v=>v||'-', defaultVis:false},
+  {key:'sector',       label:'類股',              type:'str',  fmt:v=>v||'-', defaultVis:true},
+  {key:'market_cap',   label:'市值(M)',           type:'num',  fmt:v=>v==null?'-':v.toLocaleString(undefined,{maximumFractionDigits:0}), defaultVis:true},
+  {key:'date',         label:'日期',              type:'str',  fmt:v=>v, defaultVis:false},
+  {key:'close',        label:'收盤',              type:'num',  fmt:v=>v==null?'-':v.toFixed(2), defaultVis:true},
+  {key:'volume',       label:'成交量',            type:'num',  fmt:v=>v==null?'-':v.toLocaleString(), defaultVis:false},
+  {key:'ret_1d',       label:'日報酬',            type:'pct',  fmt:v=>fmtPct(v), defaultVis:true},
+  {key:'ret_1w',       label:'週報酬',            type:'pct',  fmt:v=>fmtPct(v), defaultVis:false},
+  {key:'ret_1m',       label:'月報酬',            type:'pct',  fmt:v=>fmtPct(v), defaultVis:false},
+  {key:'vol_5',        label:'5日波動',           type:'pct',  fmt:v=>fmtVol(v), defaultVis:true},
+  {key:'vol_20',       label:'20日波動',          type:'pct',  fmt:v=>fmtVol(v), defaultVis:true},
+  {key:'vol_60',       label:'60日波動',          type:'pct',  fmt:v=>fmtVol(v), defaultVis:true},
+  {key:'vol_ratio',    label:'波動比值(5日/60日)', type:'num', fmt:v=>v==null||isNaN(v)?'-':v.toFixed(2), defaultVis:true},
+];
+
+function fmtPct(v){ if(v==null||isNaN(v)) return '-'; return (v*100).toFixed(2)+'%'; }
+function fmtVol(v){ if(v==null||isNaN(v)) return '-'; return (v*100).toFixed(1)+'%'; }
+function avg(arr){ const v=arr.filter(x=>x!=null&&!isNaN(x)); return v.length?v.reduce((a,b)=>a+b,0)/v.length:null; }
+
+let state = {
+  visible: new Set(COLS.filter(c=>c.defaultVis).map(c=>c.key)),
+  sortKey: 'market_cap', sortDir: 'desc',
+  search: '', mcapTop: 100, topN: 10,
+  grouped: false, collapsed: new Set(),
+};
+
+document.getElementById('meta').innerHTML =
+  `共 <span class="hl">${DATA.length}</span> 檔　｜　資料日期：<span class="hl">${DATA_DATE || '-'}</span>`;
+
+const sortColEl = document.getElementById('sortCol');
+COLS.forEach(c => { const o = document.createElement('option'); o.value = c.key; o.textContent = c.label; sortColEl.appendChild(o); });
+sortColEl.value = state.sortKey;
+
+const ctEl = document.getElementById('colToggle');
+COLS.forEach(c => {
+  const el = document.createElement('span');
+  el.className = 'chip' + (state.visible.has(c.key)?' on':'');
+  el.textContent = c.label; el.dataset.key = c.key;
+  el.onclick = () => {
+    if (state.visible.has(c.key)) { state.visible.delete(c.key); el.classList.remove('on'); }
+    else { state.visible.add(c.key); el.classList.add('on'); }
+    render();
+  };
+  ctEl.appendChild(el);
+});
+
+document.getElementById('search').addEventListener('input', e=>{ state.search = e.target.value.toLowerCase(); render(); });
+document.getElementById('mcapTop').addEventListener('input', e=>{ state.mcapTop = parseInt(e.target.value)||0; render(); });
+sortColEl.addEventListener('change', e=>{ state.sortKey = e.target.value; render(); });
+document.getElementById('sortDir').addEventListener('change', e=>{ state.sortDir = e.target.value; render(); });
+document.getElementById('topN').addEventListener('input', e=>{ state.topN = parseInt(e.target.value)||0; render(); });
+document.getElementById('exportBtn').onclick = exportCSV;
+
+const groupBtn = document.getElementById('groupBtn');
+groupBtn.onclick = ()=>{ state.grouped = !state.grouped; groupBtn.classList.toggle('active', state.grouped); render(); };
+document.getElementById('expandAllBtn').onclick = ()=>{ state.collapsed.clear(); render(); };
+document.getElementById('collapseAllBtn').onclick = ()=>{
+  const sectors = [...new Set(DATA.map(d=>d.sector).filter(Boolean))];
+  sectors.forEach(s => state.collapsed.add(s));
+  render();
+};
+
+function getRows(){
+  let rows = DATA.slice();
+  if (state.mcapTop > 0) rows = rows.filter(r => r.mcap_rank != null && r.mcap_rank <= state.mcapTop);
+  if (state.search) {
+    rows = rows.filter(r =>
+      (r.ric||'').toLowerCase().includes(state.search) ||
+      (r.company_name||'').toLowerCase().includes(state.search) ||
+      (r.name_zh||'').toLowerCase().includes(state.search)
+    );
+  }
+  return rows;
+}
+
+function sortRows(rows){
+  const k = state.sortKey;
+  const dir = state.sortDir === 'asc' ? 1 : -1;
+  return rows.slice().sort((a,b)=>{
+    let va = a[k], vb = b[k];
+    if (va==null && vb==null) return 0;
+    if (va==null) return 1;
+    if (vb==null) return -1;
+    if (typeof va === 'number') return (va-vb)*dir;
+    return (''+va).localeCompare(''+vb)*dir;
+  });
+}
+
+function render(){
+  const visCols = COLS.filter(c => state.visible.has(c.key) && !(state.grouped && c.key === 'sector'));
+  const thead = document.getElementById('thead');
+  thead.innerHTML = '';
+  visCols.forEach(c => {
+    const th = document.createElement('th');
+    th.textContent = c.label;
+    if (c.type === 'num' || c.type === 'pct') th.classList.add('num');
+    if (c.key === state.sortKey) th.classList.add(state.sortDir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+    th.onclick = ()=>{
+      if (state.sortKey === c.key) state.sortDir = state.sortDir==='asc'?'desc':'asc';
+      else { state.sortKey = c.key; state.sortDir = c.type==='str'?'asc':'desc'; }
+      sortColEl.value = state.sortKey;
+      document.getElementById('sortDir').value = state.sortDir;
+      render();
+    };
+    thead.appendChild(th);
+  });
+
+  const filtered = getRows();
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+
+  if (state.grouped) {
+    const groups = {};
+    filtered.forEach(r => { const s = r.sector || '(未分類)'; (groups[s] = groups[s] || []).push(r); });
+    const sumMcap = arr => arr.reduce((s,r)=>s+(r.market_cap||0),0);
+    const sortedSectors = Object.keys(groups).sort((a,b)=> sumMcap(groups[b]) - sumMcap(groups[a]));
+    let totalShown = 0;
+    sortedSectors.forEach(sec => {
+      const items = sortRows(groups[sec]);
+      const collapsed = state.collapsed.has(sec);
+      const ret1d = avg(items.map(r=>r.ret_1d));
+      const v20 = avg(items.map(r=>r.vol_20));
+      const vr = avg(items.map(r=>r.vol_ratio));
+      const totMcap = sumMcap(items);
+      const totMcapStr = totMcap >= 1e6 ? (totMcap/1e6).toFixed(2)+'T' : (totMcap/1e3).toFixed(0)+'B';
+      const gtr = document.createElement('tr');
+      gtr.className = 'group-row';
+      const gtd = document.createElement('td');
+      gtd.colSpan = visCols.length;
+      gtd.innerHTML = `<span class="arrow ${collapsed?'collapsed':''}">▼</span> ${sec} <span class="group-stats">(${items.length} 檔｜總市值 $${totMcapStr}｜均日報酬 ${fmtPct(ret1d)}｜均波動20 ${fmtVol(v20)}｜均波動比 ${vr==null?'-':vr.toFixed(2)})</span>`;
+      gtr.onclick = ()=>{ if (state.collapsed.has(sec)) state.collapsed.delete(sec); else state.collapsed.add(sec); render(); };
+      gtr.appendChild(gtd);
+      tbody.appendChild(gtr);
+      if (!collapsed) {
+        items.forEach((r, i) => {
+          const tr = document.createElement('tr');
+          if (i < state.topN) tr.classList.add('top');
+          visCols.forEach(c => {
+            const td = document.createElement('td');
+            const v = r[c.key];
+            td.textContent = c.fmt(v);
+            if (c.type === 'num' || c.type === 'pct') td.classList.add('num');
+            if (c.type === 'pct' && typeof v === 'number' && !c.key.startsWith('vol_')) td.classList.add(v >= 0 ? 'pos' : 'neg');
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr); totalShown++;
+        });
+      }
+    });
+    document.getElementById('count').textContent = `${sortedSectors.length} 產業｜顯示 ${totalShown} / ${filtered.length}`;
+  } else {
+    const rows = sortRows(filtered);
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      if (i < state.topN) tr.classList.add('top');
+      visCols.forEach(c => {
+        const td = document.createElement('td');
+        const v = r[c.key];
+        td.textContent = c.fmt(v);
+        if (c.type === 'num' || c.type === 'pct') td.classList.add('num');
+        if (c.type === 'pct' && typeof v === 'number' && !c.key.startsWith('vol_')) td.classList.add(v >= 0 ? 'pos' : 'neg');
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    document.getElementById('count').textContent = `顯示 ${rows.length} / ${DATA.length}`;
+  }
+  renderCards();
+}
+
+function buildCard(r, idx) {
+  const card = document.createElement('div');
+  card.className = 'card' + (idx < state.topN ? ' top' : '');
+  const ret1d = r.ret_1d, ret1w = r.ret_1w, ret1m = r.ret_1m;
+  const cls = v => v==null||isNaN(v)?'':(v>=0?'pos':'neg');
+  const mcap = r.market_cap;
+  const mcapStr = mcap==null?'-':(mcap >= 1e6 ? '$'+(mcap/1e6).toFixed(2)+'T' : '$'+(mcap/1e3).toFixed(1)+'B');
+  card.innerHTML = `
+    <div class="card-head">
+      <div>
+        <div class="card-title">${r.name_zh || r.company_name || '-'}</div>
+        <div class="card-sub">${r.ric}　·　${r.sector || '-'}　·　${mcapStr}</div>
+      </div>
+      <div class="card-rank">#${r.mcap_rank ?? '-'}</div>
+    </div>
+    <div class="card-grid">
+      <span class="lbl">日報酬</span><span class="val ${cls(ret1d)}">${fmtPct(ret1d)}</span>
+      <span class="lbl">5日波動</span><span class="val">${fmtVol(r.vol_5)}</span>
+      <span class="lbl">20日波動</span><span class="val">${fmtVol(r.vol_20)}</span>
+      <span class="lbl">60日波動</span><span class="val">${fmtVol(r.vol_60)}</span>
+      <span class="lbl">波動比(5/60)</span><span class="val">${r.vol_ratio==null||isNaN(r.vol_ratio)?'-':r.vol_ratio.toFixed(2)}</span>
+      <span class="lbl">收盤</span><span class="val">${r.close==null?'-':r.close.toFixed(2)}</span>
+    </div>
+    <div class="card-more">
+      <div class="card-grid">
+        <span class="lbl">週報酬</span><span class="val ${cls(ret1w)}">${fmtPct(ret1w)}</span>
+        <span class="lbl">月報酬</span><span class="val ${cls(ret1m)}">${fmtPct(ret1m)}</span>
+        <span class="lbl">成交量</span><span class="val">${r.volume==null?'-':r.volume.toLocaleString()}</span>
+        <span class="lbl">日期</span><span class="val">${r.date||'-'}</span>
+      </div>
+    </div>
+    <div class="card-toggle">▾ 展開更多</div>
+  `;
+  card.querySelector('.card-toggle').onclick = (e)=>{
+    e.stopPropagation();
+    card.classList.toggle('expanded');
+    e.target.textContent = card.classList.contains('expanded') ? '▴ 收起' : '▾ 展開更多';
+  };
+  return card;
+}
+
+function renderCards() {
+  const wrap = document.getElementById('cardWrap');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const filtered = getRows();
+  if (state.grouped) {
+    const groups = {};
+    filtered.forEach(r => { const s = r.sector || '(未分類)'; (groups[s] = groups[s] || []).push(r); });
+    const sumMcap = arr => arr.reduce((s,r)=>s+(r.market_cap||0),0);
+    const sortedSectors = Object.keys(groups).sort((a,b)=> sumMcap(groups[b]) - sumMcap(groups[a]));
+    sortedSectors.forEach(sec => {
+      const items = sortRows(groups[sec]);
+      const collapsed = state.collapsed.has(sec);
+      const totMcap = sumMcap(items);
+      const totMcapStr = totMcap >= 1e6 ? '$'+(totMcap/1e6).toFixed(2)+'T' : '$'+(totMcap/1e3).toFixed(0)+'B';
+      const ret1d = avg(items.map(r=>r.ret_1d));
+      const gh = document.createElement('div');
+      gh.className = 'card-group';
+      gh.innerHTML = `${collapsed?'▶':'▼'} ${sec} <span class="stats">${items.length} 檔｜${totMcapStr}｜均日報酬 ${fmtPct(ret1d)}</span>`;
+      gh.onclick = ()=>{ if (state.collapsed.has(sec)) state.collapsed.delete(sec); else state.collapsed.add(sec); render(); };
+      wrap.appendChild(gh);
+      if (!collapsed) items.forEach((r, i) => wrap.appendChild(buildCard(r, i)));
+    });
+  } else {
+    sortRows(filtered).forEach((r, i) => wrap.appendChild(buildCard(r, i)));
+  }
+}
+
+function exportCSV(){
+  const visCols = COLS.filter(c => state.visible.has(c.key) && !(state.grouped && c.key === 'sector'));
+  const rows = sortRows(getRows());
+  const lines = [visCols.map(c=>c.label).join(',')];
+  rows.forEach(r => {
+    lines.push(visCols.map(c => {
+      const v = r[c.key];
+      if (v == null) return '';
+      const s = (''+v).replace(/"/g,'""');
+      return /[",\n]/.test(s) ? `"${s}"` : s;
+    }).join(','));
+  });
+  const blob = new Blob(['﻿'+lines.join('\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ranking_${DATA[0]?.date||'export'}.csv`;
+  a.click();
+}
+
+
+async function loadRankingData(){
+  try {
+    const res = await fetch('data/ranking.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const payload = await res.json();
+    DATA = payload.records || [];
+    DATA_DATE = payload.dataDate || DATA[0]?.date || null;
+    document.getElementById('meta').innerHTML =
+      `共 <span class="hl">${DATA.length}</span> 檔　｜　資料日期：<span class="hl">${DATA_DATE || '-'}</span>`;
+    render();
+  } catch (err) {
+    document.getElementById('meta').innerHTML = '<span class="hl">資料載入失敗</span>';
+    document.getElementById('count').textContent =
+      'Cannot load data/ranking.json. Use a static web server instead of opening file:// directly.';
+    console.error(err);
+  }
+}
+
+
+async function loadRankingData(){
+  try {
+    const res = await fetch('data/ranking.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const payload = await res.json();
+    DATA = payload.records || [];
+    DATA_DATE = payload.dataDate || DATA[0]?.date || null;
+    document.getElementById('meta').innerHTML =
+      `共 <span class="hl">${DATA.length}</span> 檔　｜　資料日期：<span class="hl">${DATA_DATE || '-'}</span>`;
+    render();
+  } catch (err) {
+    document.getElementById('meta').innerHTML = '<span class="hl">資料載入失敗</span>';
+    document.getElementById('count').textContent =
+      'Cannot load data/ranking.json. Use a static web server instead of opening file:// directly.';
+    console.error(err);
+  }
+}
+
+
+async function loadRankingData(){
+  try {
+    const res = await fetch('data/ranking.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const payload = await res.json();
+    DATA = payload.records || [];
+    DATA_DATE = payload.dataDate || DATA[0]?.date || null;
+    document.getElementById('meta').innerHTML =
+      `共 <span class="hl">${DATA.length}</span> 檔　｜　資料日期：<span class="hl">${DATA_DATE || '-'}</span>`;
+    render();
+  } catch (err) {
+    document.getElementById('meta').innerHTML = '<span class="hl">資料載入失敗</span>';
+    document.getElementById('count').textContent =
+      'Cannot load data/ranking.json. Use a static web server instead of opening file:// directly.';
+    console.error(err);
+  }
+}
+
+
+async function loadRankingData(){
+  try {
+    const res = await fetch('data/ranking.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const payload = await res.json();
+    DATA = payload.records || [];
+    DATA_DATE = payload.dataDate || DATA[0]?.date || null;
+    document.getElementById('meta').innerHTML =
+      `共 <span class="hl">${DATA.length}</span> 檔　｜　資料日期：<span class="hl">${DATA_DATE || '-'}</span>`;
+    render();
+  } catch (err) {
+    document.getElementById('meta').innerHTML = '<span class="hl">資料載入失敗</span>';
+    document.getElementById('count').textContent =
+      'Cannot load data/ranking.json. Use a static web server instead of opening file:// directly.';
+    console.error(err);
+  }
+}
+
+
+async function loadRankingData(){
+  try {
+    const res = await fetch('data/ranking.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const payload = await res.json();
+    DATA = payload.records || [];
+    DATA_DATE = payload.dataDate || DATA[0]?.date || null;
+    document.getElementById('meta').innerHTML =
+      `共 <span class="hl">${DATA.length}</span> 檔　｜　資料日期：<span class="hl">${DATA_DATE || '-'}</span>`;
+    render();
+  } catch (err) {
+    document.getElementById('meta').innerHTML = '<span class="hl">資料載入失敗</span>';
+    document.getElementById('count').textContent =
+      'Cannot load data/ranking.json. Use a static web server instead of opening file:// directly.';
+    console.error(err);
+  }
+}
+
+loadRankingData();
+</script>
+</body>
+</html>

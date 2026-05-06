@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HSP Calculator | S&amp;P 500</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system, "Segoe UI", "Microsoft JhengHei", sans-serif; background:#0f1115; color:#e4e6eb; }
+  header { position:sticky; top:0; z-index:10; padding:14px 20px; border-bottom:1px solid #2a2f3a; background:#161922; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  h1 { margin:0; font-size:18px; font-weight:650; }
+  a { color:#9db7ff; text-decoration:none; }
+  nav { display:flex; gap:8px; align-items:center; }
+  nav a { padding:6px 10px; border:1px solid #2a2f3a; border-radius:4px; background:#1c2030; font-size:13px; }
+  nav a.active { background:#2d4a8a; border-color:#4a7cff; color:#fff; }
+  main { padding:18px 20px 28px; display:grid; grid-template-columns: 390px minmax(0, 1fr); gap:18px; }
+  .panel { background:#161922; border:1px solid #2a2f3a; border-radius:8px; }
+  .panel h2 { margin:0; padding:12px 14px; border-bottom:1px solid #2a2f3a; font-size:14px; color:#dbe2f5; }
+  .body { padding:14px; }
+  label { display:block; margin:0 0 10px; font-size:12px; color:#a8b0c2; }
+  input, select, button { width:100%; margin-top:5px; background:#1c2030; color:#e4e6eb; border:1px solid #2a2f3a; border-radius:4px; padding:7px 9px; font-size:13px; }
+  select[multiple] { height:190px; }
+  button { cursor:pointer; font-weight:650; }
+  button.primary { background:#2d4a8a; border-color:#4a7cff; color:#fff; }
+  button:hover { background:#252b3d; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .muted { color:#8b93a7; font-size:12px; line-height:1.5; }
+  .selected-list { margin:-2px 0 12px; display:flex; flex-wrap:wrap; gap:6px; min-height:28px; }
+  .selected-chip { display:inline-flex; align-items:center; gap:6px; padding:5px 8px; border:1px solid #2a2f3a; border-radius:999px; background:#1c2030; color:#dbe2f5; font-size:12px; max-width:100%; }
+  .selected-chip button { width:auto; margin:0; padding:0 2px; border:0; background:transparent; color:#8b93a7; font-size:14px; line-height:1; }
+  .selected-chip button:hover { color:#fff; background:transparent; }
+  .kpis { display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap:10px; }
+  .kpi { background:#13161e; border:1px solid #2a2f3a; border-radius:8px; padding:12px; min-height:76px; }
+  .kpi .label { color:#8b93a7; font-size:12px; }
+  .kpi .value { margin-top:6px; font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .pos { color:#3fcf8e; }
+  .neg { color:#ff5f6d; }
+  .grid { margin-top:14px; display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { padding:7px 8px; border-bottom:1px solid #242936; text-align:left; white-space:nowrap; }
+  th { color:#a8b0c2; font-weight:600; background:#1c2030; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .log { margin-top:14px; min-height:70px; white-space:pre-wrap; color:#a8b0c2; }
+  .help { margin-top:14px; padding:12px 14px; background:#13161e; border-top:1px solid #2a2f3a; color:#8b93a7; font-size:12px; line-height:1.55; }
+  @media (max-width: 980px) {
+    main { grid-template-columns:1fr; padding:12px; }
+    .kpis, .grid { grid-template-columns:1fr; }
+    header { padding:10px 12px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>HSP Calculator</h1>
+  <nav>
+    <a href="index.html">Ranking</a>
+    <a class="active" href="hsp.html">HSP</a>
+  </nav>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>Product Settings</h2>
+    <div class="body">
+      <label>Search underlying
+        <input id="ricSearch" placeholder="AAPL, MSFT, NVDA">
+      </label>
+      <label>Underlying (multi-select, worst-of)
+        <select id="rics" multiple></select>
+      </label>
+      <div id="selectedUnderlyings" class="selected-list"></div>
+
+      <div class="row">
+        <label>Calculation mode
+          <select id="calcMode">
+            <option value="hsp">Strike to HSP</option>
+            <option value="strike">Target HSP to Strike</option>
+          </select>
+        </label>
+        <label>Target HSP (%)
+          <input id="targetHsp" type="number" value="20" min="0" max="100" step="0.5">
+        </label>
+      </div>
+
+      <div class="row">
+        <label>Strike (%)
+          <input id="strike" type="number" value="80" step="0.5">
+        </label>
+        <label>KO initial level (%)
+          <input id="ko" type="number" value="100" step="0.5">
+        </label>
+      </div>
+      <div class="row">
+        <label>KI level (%)
+          <input id="ki" type="number" value="70" step="0.5">
+        </label>
+        <label>Step-down per observation (%)
+          <input id="stepDown" type="number" value="0" step="0.25">
+        </label>
+      </div>
+      <div class="row">
+        <label>Tenor (months)
+          <input id="tenor" type="number" value="6" min="1" step="1">
+        </label>
+        <label>KO observation frequency (months)
+          <input id="obsFreq" type="number" value="1" min="1" step="1">
+        </label>
+      </div>
+      <label>Vol / correlation estimation window
+        <select id="lookback">
+          <option value="auto">Auto by tenor</option>
+          <option value="63">3M: about 63 trading days</option>
+          <option value="126">6M: about 126 trading days</option>
+          <option value="252">1Y: about 252 trading days</option>
+          <option value="504">2Y: about 504 trading days</option>
+          <option value="756">3Y: about 756 trading days</option>
+          <option value="all">All common trading days</option>
+        </select>
+      </label>
+      <div class="row">
+        <label>KO Type
+          <select id="koType">
+            <option>Period End</option>
+            <option>Period End Memory</option>
+            <option>Daily</option>
+            <option>Daily Memory</option>
+          </select>
+        </label>
+        <label>Barrier Type
+          <select id="barrierType">
+            <option>AKI</option>
+            <option>EKI</option>
+            <option>NONE</option>
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <label>Simulation paths
+          <input id="paths" type="number" value="20000" min="1000" max="200000" step="1000">
+        </label>
+        <label>Annual drift (%)
+          <input id="drift" type="number" value="0" step="0.5">
+        </label>
+      </div>
+      <button id="runBtn" class="primary">Calculate</button>
+      <div class="row" style="margin-top:10px;">
+        <label>Combo size
+          <select id="comboSize">
+            <option value="1">1 underlying</option>
+            <option value="2">2 underlyings</option>
+            <option value="3">3 underlyings</option>
+          </select>
+        </label>
+        <label>Max combos
+          <input id="comboMax" type="number" value="50" min="1" max="500" step="1">
+        </label>
+      </div>
+      <button id="comboBtn">Run Combo Analysis</button>
+      <div class="help">
+        HSP is the simulated probability of no KO, terminal worst-of below Strike, and KI triggered. Historical adj_close data is loaded from this project's data lake.
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kpis">
+      <div class="kpi"><div class="label">HSP</div><div id="hsp" class="value">-</div></div>
+      <div class="kpi"><div class="label">Solved Strike</div><div id="solvedStrike" class="value">-</div></div>
+      <div class="kpi"><div class="label">KO Probability</div><div id="koProb" class="value">-</div></div>
+      <div class="kpi"><div class="label">Std. Error</div><div id="stderr" class="value">-</div></div>
+      <div class="kpi"><div class="label">95% CI</div><div id="ci" class="value" style="font-size:15px;">-</div></div>
+    </div>
+    <div class="grid">
+      <div class="panel">
+        <h2>Estimated Parameters</h2>
+        <div class="body"><table><thead><tr><th>RIC</th><th>Name</th><th class="num">S0</th><th class="num">Ann. Vol</th></tr></thead><tbody id="paramRows"></tbody></table></div>
+      </div>
+      <div class="panel">
+        <h2>Correlation Matrix</h2>
+        <div class="body" style="overflow:auto;"><table id="corrTbl"></table></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:14px;">
+      <h2>Result Notes</h2>
+      <div id="log" class="body log">Loading data/hsp_prices.json...</div>
+    </div>
+    <div class="panel" style="margin-top:14px;">
+      <h2>Combo Analysis</h2>
+      <div class="body" style="overflow:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Underlyings</th>
+              <th class="num">HSP</th>
+              <th class="num">Solved Strike</th>
+              <th class="num">KO Prob.</th>
+              <th class="num">Std. Error</th>
+            </tr>
+          </thead>
+          <tbody id="comboRows">
+            <tr><td colspan="6" class="muted">Select a basket, choose combo size, then run combo analysis.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+let HSP_DATA = null;
+const TRADING_DAYS = 252;
+const DEFAULT_RICS = ["NVDA.OQ", "AAPL.OQ", "MSFT.OQ"];
+var SELECTED_RICS = new Set(DEFAULT_RICS);
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function(c) {
+    return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];
+  });
+}
+function pct(x){ return Number.isFinite(x) ? (x * 100).toFixed(2) + "%" : "-"; }
+function num(x, d){ return Number.isFinite(x) ? x.toFixed(d == null ? 2 : d) : "-"; }
+function mean(xs){ return xs.reduce(function(a,b){ return a+b; }, 0) / xs.length; }
+function std(xs) {
+  var m = mean(xs);
+  return Math.sqrt(xs.reduce(function(s,x){ return s + (x-m)*(x-m); }, 0) / Math.max(1, xs.length - 1));
+}
+
+function selectedRics() {
+  return Array.from(SELECTED_RICS);
+}
+
+function renderSelectedUnderlyings(existingSelection) {
+  if (existingSelection) SELECTED_RICS = new Set(Array.from(existingSelection));
+  var selected = selectedRics();
+  var box = document.getElementById("selectedUnderlyings");
+  if (!selected.length) {
+    box.innerHTML = '<span class="muted">No underlyings selected</span>';
+    return;
+  }
+  box.innerHTML = selected.map(function(ric) {
+    var meta = HSP_DATA.meta[ric] || {};
+    var label = ric + (meta.name ? " - " + meta.name : "");
+    return '<span class="selected-chip" title="' + esc(label) + '">' + esc(label) +
+      '<button type="button" data-ric="' + esc(ric) + '" aria-label="Remove ' + esc(ric) + '">x</button></span>';
+  }).join("");
+  Array.from(box.querySelectorAll("button[data-ric]")).forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      Array.from(document.getElementById("rics").options).forEach(function(option) {
+        if (option.value === btn.dataset.ric) option.selected = false;
+      });
+      SELECTED_RICS.delete(btn.dataset.ric);
+      renderSelectedUnderlyings();
+    });
+  });
+}
+
+function populateRicSelect(filter) {
+  filter = filter || "";
+  var select = document.getElementById("rics");
+  var selected = new Set(selectedRics());
+  if (!selected.size) DEFAULT_RICS.forEach(function(r){ selected.add(r); });
+  SELECTED_RICS = new Set(selected);
+  var q = filter.trim().toLowerCase();
+  var rics = Object.keys(HSP_DATA.series).filter(function(ric) {
+    var meta = HSP_DATA.meta[ric] || {};
+    return !q || ric.toLowerCase().indexOf(q) >= 0 || String(meta.name || "").toLowerCase().indexOf(q) >= 0;
+  }).slice(0, 180);
+  select.innerHTML = "";
+  rics.forEach(function(ric) {
+    var meta = HSP_DATA.meta[ric] || {};
+    var option = document.createElement("option");
+    option.value = ric;
+    option.textContent = ric + " - " + (meta.name || ric);
+    option.selected = selected.has(ric);
+    select.appendChild(option);
+  });
+  renderSelectedUnderlyings(selected);
+}
+
+function dailyReturns(ric) {
+  var rows = HSP_DATA.series[ric] || [];
+  var out = [];
+  for (var i = 1; i < rows.length; i++) {
+    var p0 = rows[i - 1][1], p1 = rows[i][1];
+    if (p0 > 0 && p1 > 0) out.push({ date: rows[i][0], ret: Math.log(p1 / p0) });
+  }
+  return out;
+}
+function autoLookbackDays(tenorM) {
+  if (tenorM <= 3) return 126;
+  if (tenorM <= 12) return 252;
+  return 504;
+}
+function selectedLookbackDays(tenorM) {
+  var raw = document.getElementById("lookback").value;
+  if (raw === "auto") return autoLookbackDays(tenorM);
+  if (raw === "all") return Infinity;
+  return Number(raw);
+}
+function lookbackLabel(days) {
+  if (!Number.isFinite(days)) return "All common trading days";
+  var labels = {63:"3M", 126:"6M", 252:"1Y", 504:"2Y", 756:"3Y"};
+  var prefix = document.getElementById("lookback").value === "auto" ? "Auto / " : "";
+  return prefix + (labels[days] || String(days) + "D") + " (" + days + " trading days)";
+}
+function alignedReturns(rics, lookbackDays) {
+  var maps = rics.map(function(ric) {
+    return new Map(dailyReturns(ric).map(function(x){ return [x.date, x.ret]; }));
+  });
+  var dates = Array.from(maps[0].keys()).filter(function(d) {
+    return maps.every(function(m){ return m.has(d); });
+  });
+  if (Number.isFinite(lookbackDays)) dates = dates.slice(-lookbackDays);
+  return dates.map(function(d) { return maps.map(function(m){ return m.get(d); }); });
+}
+function corr(xs, ys) {
+  var mx = mean(xs), my = mean(ys), nume = 0, vx = 0, vy = 0;
+  for (var i = 0; i < xs.length; i++) {
+    var dx = xs[i] - mx, dy = ys[i] - my;
+    nume += dx * dy; vx += dx * dx; vy += dy * dy;
+  }
+  return vx > 0 && vy > 0 ? nume / Math.sqrt(vx * vy) : 0;
+}
+function cholesky(a) {
+  var n = a.length;
+  var l = Array.from({length:n}, function(){ return Array(n).fill(0); });
+  for (var i = 0; i < n; i++) {
+    for (var j = 0; j <= i; j++) {
+      var sum = 0;
+      for (var k = 0; k < j; k++) sum += l[i][k] * l[j][k];
+      if (i === j) l[i][j] = Math.sqrt(Math.max(a[i][i] - sum, 1e-10));
+      else l[i][j] = (a[i][j] - sum) / l[j][j];
+    }
+  }
+  return l;
+}
+function rng(seed) {
+  var s = seed >>> 0;
+  return function() {
+    s = (1664525 * s + 1013904223) >>> 0;
+    return (s + 1) / 4294967297;
+  };
+}
+function normals(rand, n) {
+  var out = [];
+  while (out.length < n) {
+    var u1 = Math.max(rand(), 1e-12), u2 = rand();
+    var mag = Math.sqrt(-2 * Math.log(u1));
+    out.push(mag * Math.cos(2 * Math.PI * u2));
+    if (out.length < n) out.push(mag * Math.sin(2 * Math.PI * u2));
+  }
+  return out;
+}
+function estimate(rics, lookbackDays) {
+  var aligned = alignedReturns(rics, lookbackDays);
+  if (aligned.length < 60) throw new Error("Common history has fewer than 60 trading days.");
+  var cols = rics.map(function(_, j){ return aligned.map(function(row){ return row[j]; }); });
+  var vols = cols.map(function(c){ return std(c) * Math.sqrt(TRADING_DAYS); });
+  var corrMat = rics.map(function(_, i) {
+    return rics.map(function(_, j) { return i === j ? 1 : corr(cols[i], cols[j]); });
+  });
+  var spots = rics.map(function(ric) {
+    var rows = HSP_DATA.series[ric];
+    return rows[rows.length - 1][1];
+  });
+  return { vols: vols, corrMat: corrMat, spots: spots, sampleDays: aligned.length };
+}
+function renderParams(rics, est) {
+  document.getElementById("paramRows").innerHTML = rics.map(function(ric, i) {
+    var meta = HSP_DATA.meta[ric] || {};
+    return "<tr><td>" + esc(ric) + "</td><td>" + esc(meta.name || "-") + "</td><td class=\"num\">" +
+      num(est.spots[i]) + "</td><td class=\"num\">" + pct(est.vols[i]) + "</td></tr>";
+  }).join("");
+  var head = "<tr><th></th>" + rics.map(function(r){ return '<th class="num">' + esc(r) + "</th>"; }).join("") + "</tr>";
+  var body = rics.map(function(r, i) {
+    return "<tr><th>" + esc(r) + "</th>" + rics.map(function(_, j) {
+      return '<td class="num">' + num(est.corrMat[i][j], 3) + "</td>";
+    }).join("") + "</tr>";
+  }).join("");
+  document.getElementById("corrTbl").innerHTML = "<thead>" + head + "</thead><tbody>" + body + "</tbody>";
+}
+
+function simulate() {
+  var rics = selectedRics();
+  if (!rics.length) throw new Error("Select at least one underlying.");
+  if (rics.length > 6) throw new Error("Browser simulation supports up to 6 underlyings at a time.");
+
+  var strike = Number(document.getElementById("strike").value) / 100;
+  var ko0 = Number(document.getElementById("ko").value) / 100;
+  var ki = Number(document.getElementById("ki").value) / 100;
+  var stepDown = Number(document.getElementById("stepDown").value) / 100;
+  var tenorM = Number(document.getElementById("tenor").value);
+  var lookbackDays = selectedLookbackDays(tenorM);
+  var obsFreqM = Number(document.getElementById("obsFreq").value);
+  var paths = Math.floor(Number(document.getElementById("paths").value));
+  var drift = Number(document.getElementById("drift").value) / 100;
+  var koType = document.getElementById("koType").value;
+  var barrierType = document.getElementById("barrierType").value;
+  var calcMode = document.getElementById("calcMode").value;
+  var targetHsp = Number(document.getElementById("targetHsp").value) / 100;
+
+  var est = estimate(rics, lookbackDays);
+  renderParams(rics, est);
+  var l = cholesky(est.corrMat);
+  var rand = rng(20260505);
+  var n = rics.length;
+  var days = Math.max(1, Math.round(TRADING_DAYS * tenorM / 12));
+  var obsEvery = Math.max(1, Math.round(TRADING_DAYS * obsFreqM / 12));
+  var obsDays = [];
+  for (var od = obsEvery; od < days; od += obsEvery) obsDays.push(od);
+  obsDays.push(days);
+  var obsSet = new Set(obsDays);
+  var isDaily = koType.indexOf("Daily") >= 0;
+  var isMemory = koType.indexOf("Memory") >= 0;
+  var dt = 1 / TRADING_DAYS;
+
+  var hsp = 0, koCount = 0, kiCount = 0;
+  var eligibleWorst = [];
+  for (var p = 0; p < paths; p++) {
+    var s = Array(n).fill(1);
+    var memory = Array(n).fill(false);
+    var koHit = false, kiHit = barrierType === "NONE";
+    for (var d = 1; d <= days; d++) {
+      var z = normals(rand, n);
+      var w = Array(n).fill(0);
+      for (var i = 0; i < n; i++) for (var j = 0; j <= i; j++) w[i] += l[i][j] * z[j];
+      for (var si = 0; si < n; si++) {
+        var vol = est.vols[si];
+        s[si] *= Math.exp((drift - 0.5 * vol * vol) * dt + vol * Math.sqrt(dt) * w[si]);
+      }
+      if (barrierType === "AKI" && Math.min.apply(null, s) <= ki) kiHit = true;
+      var shouldCheckKo = isDaily || obsSet.has(d);
+      if (shouldCheckKo) {
+        var obsNo = Math.max(0, Math.ceil(d / obsEvery) - 1);
+        var koLevel = ko0 - stepDown * obsNo;
+        if (isMemory) {
+          for (var mi = 0; mi < n; mi++) if (s[mi] >= koLevel) memory[mi] = true;
+          if (memory.every(Boolean)) koHit = true;
+        } else if (s.every(function(x){ return x >= koLevel; })) {
+          koHit = true;
+        }
+      }
+      if (koHit) break;
+    }
+    if (koHit) {
+      koCount++;
+      continue;
+    }
+    var terminalWorst = Math.min.apply(null, s);
+    if (barrierType === "EKI" && terminalWorst <= ki) kiHit = true;
+    if (kiHit) {
+      kiCount++;
+      eligibleWorst.push(terminalWorst);
+    }
+    if (terminalWorst < strike && kiHit) hsp++;
+  }
+
+  var solvedStrike = null;
+  var impossibleTarget = false;
+  if (calcMode === "strike") {
+    var sortedWorst = eligibleWorst.slice().sort(function(a, b){ return a - b; });
+    var requiredHits = Math.ceil(targetHsp * paths);
+    if (requiredHits <= 0) {
+      solvedStrike = 0;
+      hsp = 0;
+    } else if (requiredHits > sortedWorst.length) {
+      impossibleTarget = true;
+      hsp = sortedWorst.length;
+    } else {
+      solvedStrike = sortedWorst[requiredHits - 1] + 1e-8;
+      hsp = sortedWorst.filter(function(x){ return x < solvedStrike; }).length;
+      document.getElementById("strike").value = (solvedStrike * 100).toFixed(2);
+    }
+  }
+
+  var hspProb = hsp / paths;
+  var koProb = koCount / paths;
+  var se = Math.sqrt(hspProb * (1 - hspProb) / paths);
+  document.getElementById("hsp").textContent = pct(hspProb);
+  document.getElementById("hsp").className = "value " + (hspProb >= 0.2 ? "neg" : "pos");
+  document.getElementById("solvedStrike").textContent = impossibleTarget ? "N/A" : (solvedStrike == null ? "-" : pct(solvedStrike));
+  document.getElementById("koProb").textContent = pct(koProb);
+  document.getElementById("stderr").textContent = pct(se);
+  document.getElementById("ci").textContent = pct(Math.max(0, hspProb - 1.96 * se)) + " ~ " + pct(Math.min(1, hspProb + 1.96 * se));
+
+  var modeLine = calcMode === "strike"
+    ? "Mode: target HSP " + pct(targetHsp) + " to Strike" + (impossibleTarget ? " (target above reachable maximum)" : " = " + pct(solvedStrike)) + "\n"
+    : "Mode: Strike " + pct(strike) + " to HSP\n";
+  document.getElementById("log").textContent =
+    "Data date: " + HSP_DATA.asOf + "\n" +
+    "Underlying: " + rics.join(", ") + "\n" +
+    modeLine +
+    "Estimation window: " + lookbackLabel(lookbackDays) + "; common sample: " + est.sampleDays + " trading days\n" +
+    "Simulation tenor: " + days + " trading days; paths: " + paths.toLocaleString() + "\n" +
+    "Event counts: HSP " + hsp.toLocaleString() + ", KO " + koCount.toLocaleString() +
+    ", KI triggered and not KO " + kiCount.toLocaleString() + ".";
+}
+
+function buildCombos(items, size, maxCount) {
+  var out = [];
+  function walk(start, combo) {
+    if (out.length >= maxCount) return;
+    if (combo.length === size) {
+      out.push(combo.slice());
+      return;
+    }
+    for (var i = start; i < items.length; i++) {
+      combo.push(items[i]);
+      walk(i + 1, combo);
+      combo.pop();
+      if (out.length >= maxCount) return;
+    }
+  }
+  walk(0, []);
+  return out;
+}
+
+function setSelectedRics(rics) {
+  var want = new Set(rics);
+  SELECTED_RICS = new Set(rics);
+  Array.from(document.getElementById("rics").options).forEach(function(option) {
+    option.selected = want.has(option.value);
+  });
+  renderSelectedUnderlyings(want);
+}
+
+function runComboAnalysis() {
+  var original = selectedRics();
+  var size = Number(document.getElementById("comboSize").value);
+  var maxCombos = Math.max(1, Math.floor(Number(document.getElementById("comboMax").value) || 50));
+  var body = document.getElementById("comboRows");
+  if (original.length < size) {
+    body.innerHTML = '<tr><td colspan="6" class="muted">Select at least ' + size + ' underlyings.</td></tr>';
+    return;
+  }
+  var combos = buildCombos(original, size, maxCombos);
+  var totalPossible = comboCount(original.length, size);
+  body.innerHTML = '<tr><td colspan="6" class="muted">Running ' + combos.length +
+    ' combo(s) out of ' + totalPossible + ' possible...</td></tr>';
+
+  var rows = [];
+  for (var i = 0; i < combos.length; i++) {
+    setSelectedRics(combos[i]);
+    try {
+      simulate();
+      rows.push({
+        idx: i + 1,
+        rics: combos[i].join(", "),
+        hsp: document.getElementById("hsp").textContent,
+        strike: document.getElementById("solvedStrike").textContent,
+        ko: document.getElementById("koProb").textContent,
+        se: document.getElementById("stderr").textContent
+      });
+    } catch (err) {
+      rows.push({
+        idx: i + 1,
+        rics: combos[i].join(", "),
+        hsp: "ERR",
+        strike: "-",
+        ko: "-",
+        se: err.message || String(err)
+      });
+    }
+  }
+
+  setSelectedRics(original);
+  if (original.length <= 6) {
+    try { simulate(); } catch (err) { document.getElementById("log").textContent = err.message || String(err); }
+  } else {
+    document.getElementById("log").textContent =
+      "Combo analysis completed for " + rows.length + " combo(s). Original basket has " +
+      original.length + " underlyings, so single-basket Calculate is skipped.";
+  }
+
+  body.innerHTML = rows.map(function(row) {
+    return "<tr><td>" + row.idx + "</td><td>" + esc(row.rics) + "</td>" +
+      '<td class="num">' + esc(row.hsp) + "</td>" +
+      '<td class="num">' + esc(row.strike) + "</td>" +
+      '<td class="num">' + esc(row.ko) + "</td>" +
+      '<td class="num">' + esc(row.se) + "</td></tr>";
+  }).join("");
+}
+
+function comboCount(n, k) {
+  if (k < 0 || k > n) return 0;
+  var nume = 1, den = 1;
+  for (var i = 1; i <= k; i++) {
+    nume *= (n - k + i);
+    den *= i;
+  }
+  return Math.round(nume / den);
+}
+
+function attachEvents() {
+  document.getElementById("ricSearch").addEventListener("input", function(e){ populateRicSelect(e.target.value); });
+  document.getElementById("rics").addEventListener("mousedown", function(e) {
+    if (e.target.tagName !== "OPTION") return;
+    e.preventDefault();
+    if (SELECTED_RICS.has(e.target.value)) {
+      SELECTED_RICS.delete(e.target.value);
+      e.target.selected = false;
+    } else {
+      SELECTED_RICS.add(e.target.value);
+      e.target.selected = true;
+    }
+    renderSelectedUnderlyings();
+  });
+  document.getElementById("rics").addEventListener("input", function(){ renderSelectedUnderlyings(); });
+  document.getElementById("rics").addEventListener("change", function(){ renderSelectedUnderlyings(); });
+  document.getElementById("runBtn").addEventListener("click", function() {
+    try { simulate(); }
+    catch (err) { document.getElementById("log").textContent = err.message || String(err); }
+  });
+  document.getElementById("comboBtn").addEventListener("click", function() {
+    try { runComboAnalysis(); }
+    catch (err) { document.getElementById("log").textContent = err.message || String(err); }
+  });
+}
+
+async function loadHspData() {
+  try {
+    const res = await fetch("data/hsp_prices.json", { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    HSP_DATA = await res.json();
+    document.getElementById("log").textContent =
+      "Data date: " + HSP_DATA.asOf + "; available RICs: " + HSP_DATA.count + ".";
+    attachEvents();
+    populateRicSelect();
+    simulate();
+  } catch (err) {
+    document.getElementById("log").textContent =
+      "Cannot load data/hsp_prices.json. Use a static web server instead of opening file:// directly.\n" +
+      (err.message || String(err));
+  }
+}
+
+loadHspData();
+</script>
+</body>
+</html>
