@@ -482,6 +482,63 @@ async function loadRankingData(){
   }
 }
 
+
+async function loadRankingData(){
+  try {
+    const res = await fetch('data/ranking.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const payload = await res.json();
+    DATA = payload.records || [];
+    DATA_DATE = payload.dataDate || DATA[0]?.date || null;
+    document.getElementById('meta').innerHTML =
+      `共 <span class="hl">${DATA.length}</span> 檔　｜　資料日期：<span class="hl">${DATA_DATE || '-'}</span>`;
+    render();
+  } catch (err) {
+    document.getElementById('meta').innerHTML = '<span class="hl">資料載入失敗</span>';
+    document.getElementById('count').textContent =
+      'Cannot load data/ranking.json. Use a static web server instead of opening file:// directly.';
+    console.error(err);
+  }
+}
+
+
+async function loadRankingData(){
+  try {
+    const res = await fetch('data/ranking.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const payload = await res.json();
+    DATA = payload.records || [];
+    DATA_DATE = payload.dataDate || DATA[0]?.date || null;
+    document.getElementById('meta').innerHTML =
+      `共 <span class="hl">${DATA.length}</span> 檔　｜　資料日期：<span class="hl">${DATA_DATE || '-'}</span>`;
+    render();
+  } catch (err) {
+    document.getElementById('meta').innerHTML = '<span class="hl">資料載入失敗</span>';
+    document.getElementById('count').textContent =
+      'Cannot load data/ranking.json. Use a static web server instead of opening file:// directly.';
+    console.error(err);
+  }
+}
+
+
+async function loadRankingData(){
+  try {
+    const res = await fetch('data/ranking.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const payload = await res.json();
+    DATA = payload.records || [];
+    DATA_DATE = payload.dataDate || DATA[0]?.date || null;
+    document.getElementById('meta').innerHTML =
+      `共 <span class="hl">${DATA.length}</span> 檔　｜　資料日期：<span class="hl">${DATA_DATE || '-'}</span>`;
+    render();
+  } catch (err) {
+    document.getElementById('meta').innerHTML = '<span class="hl">資料載入失敗</span>';
+    document.getElementById('count').textContent =
+      'Cannot load data/ranking.json. Use a static web server instead of opening file:// directly.';
+    console.error(err);
+  }
+}
+
 loadRankingData();
 </script>
 </body>
