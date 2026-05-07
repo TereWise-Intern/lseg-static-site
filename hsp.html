@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HSP Calculator | S&amp;P 500</title>
+<title>HSP Calculator | Multi-market</title>
 <style>
   * { box-sizing: border-box; }
   body { margin:0; font-family:-apple-system, "Segoe UI", "Microsoft JhengHei", sans-serif; background:#0f1115; color:#e4e6eb; }
@@ -48,6 +48,342 @@
     header { padding:10px 12px; }
   }
 </style>
+
+<style id="hsp-draft-layout">
+  :root {
+    --draft-gap: 14px;
+  }
+
+  main {
+    display: block;
+    padding: 16px 18px 28px;
+  }
+
+  main > section.panel:first-of-type {
+    margin-bottom: var(--draft-gap);
+  }
+
+  main > section.panel:first-of-type h2::after {
+    content: " / Product Selection";
+    color: #8b93a7;
+    font-weight: 500;
+  }
+
+  main > section.panel:first-of-type .body {
+    display: grid;
+    grid-template-columns: minmax(360px, 1.2fr) repeat(6, minmax(112px, 1fr));
+    gap: 12px 14px;
+    align-items: start;
+  }
+
+  main > section.panel:first-of-type .body > label,
+  main > section.panel:first-of-type .body > .row,
+  main > section.panel:first-of-type .body > button {
+    margin: 0;
+    min-width: 0;
+  }
+
+  main > section.panel:first-of-type .body > .row {
+    display: contents;
+  }
+
+  main > section.panel:first-of-type .body > .row > label {
+    margin: 0;
+    min-width: 0;
+  }
+
+  main > section.panel:first-of-type input,
+  main > section.panel:first-of-type select:not([multiple]),
+  main > section.panel:first-of-type button {
+    min-height: 40px;
+  }
+
+  main > section.panel:first-of-type .body > label:nth-child(1) {
+    grid-column: 1 / span 2;
+    grid-row: 1;
+  }
+
+  main > section.panel:first-of-type .body > label:nth-child(2) {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  main > section.panel:first-of-type .body > label:nth-child(3) {
+    grid-column: 1 / span 3;
+    grid-row: 2 / span 3;
+    align-self: stretch;
+  }
+
+  main > section.panel:first-of-type select[multiple] {
+    height: 150px;
+  }
+
+  main > section.panel:first-of-type #selectedUnderlyings {
+    grid-column: 4 / -1;
+    grid-row: 2;
+    align-self: center;
+    min-height: 40px;
+    margin: 0;
+  }
+
+  main > section.panel:first-of-type .body > .row:nth-child(4) > label:nth-child(1) {
+    grid-column: 4;
+    grid-row: 3;
+  }
+
+  main > section.panel:first-of-type .body > .row:nth-child(5) > label:nth-child(1) {
+    grid-column: 4;
+    grid-row: 3;
+  }
+
+  main > section.panel:first-of-type .body > .row:nth-child(5) > label:nth-child(2) {
+    grid-column: 5;
+    grid-row: 3;
+  }
+
+  main > section.panel:first-of-type .body > .row:nth-child(6) > label:nth-child(1) {
+    grid-column: 6;
+    grid-row: 3;
+  }
+
+  main > section.panel:first-of-type .body > .row:nth-child(6) > label:nth-child(2) {
+    grid-column: 7;
+    grid-row: 3;
+  }
+
+  main > section.panel:first-of-type .body > .row:nth-child(7) > label:nth-child(1) {
+    grid-column: 4;
+    grid-row: 4;
+  }
+
+  main > section.panel:first-of-type .body > .row:nth-child(7) > label:nth-child(2) {
+    grid-column: 5;
+    grid-row: 4;
+  }
+
+  main > section.panel:first-of-type .body > .row:nth-child(8) > label:nth-child(1) {
+    grid-column: 6;
+    grid-row: 4;
+  }
+
+  main > section.panel:first-of-type .body > .row:nth-child(8) > label:nth-child(2) {
+    grid-column: 7;
+    grid-row: 4;
+  }
+
+  main > section.panel:first-of-type .body > label:nth-child(9) {
+    grid-column: 1 / span 3;
+    grid-row: 5;
+  }
+
+  main > section.panel:first-of-type .body > .row:nth-child(10) > label:nth-child(1) {
+    grid-column: 4;
+    grid-row: 5;
+  }
+
+  main > section.panel:first-of-type .body > .row:nth-child(10) > label:nth-child(2) {
+    grid-column: 5;
+    grid-row: 5;
+  }
+
+  main > section.panel:first-of-type .body > .row:nth-child(11) > label:nth-child(1) {
+    grid-column: 6;
+    grid-row: 5;
+  }
+
+  main > section.panel:first-of-type .body > .row:nth-child(11) > label:nth-child(2) {
+    grid-column: 7;
+    grid-row: 5;
+  }
+
+  main > section.panel:first-of-type #runBtn {
+    grid-column: 4 / span 2;
+    grid-row: 6;
+  }
+
+  main > section.panel:first-of-type .body > .row:nth-child(13) > label:nth-child(1) {
+    grid-column: 6;
+    grid-row: 6;
+  }
+
+  main > section.panel:first-of-type .body > .row:nth-child(13) > label:nth-child(2) {
+    grid-column: 7;
+    grid-row: 6;
+  }
+
+  main > section.panel:first-of-type #comboBtn {
+    grid-column: 4 / span 4;
+    grid-row: 7;
+  }
+
+  main > section.panel:first-of-type .help {
+    grid-column: 1 / -1;
+    grid-row: 8;
+    margin: 0;
+    padding: 8px 10px;
+  }
+
+  main > section.panel:first-of-type #runBtn,
+  main > section.panel:first-of-type #comboBtn {
+    min-height: 36px;
+  }
+
+  main > section:not(.panel) {
+    display: block;
+  }
+
+  .draft-summary-row {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.86fr) minmax(500px, 1.7fr);
+    gap: var(--draft-gap);
+    align-items: stretch;
+  }
+
+  .draft-summary-row .kpis {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(130px, 1fr));
+    gap: var(--draft-gap);
+    margin: 0;
+  }
+
+  .draft-summary-row .kpi {
+    min-height: 118px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .draft-summary-row .kpi .value {
+    font-size: clamp(26px, 3vw, 42px);
+  }
+
+  .draft-summary-row .kpi.is-hidden {
+    display: none;
+  }
+
+  .submetric {
+    margin-top: 10px;
+    padding-top: 9px;
+    border-top: 1px solid #242936;
+    color: #a8b0c2;
+    font-size: 12px;
+    display: block;
+  }
+
+  .submetric .value {
+    margin: 8px 0 0;
+    font-size: clamp(26px, 3vw, 42px);
+    font-weight: 700;
+    color: #dbe2f5;
+  }
+
+  .draft-summary-row .panel {
+    min-height: 158px;
+  }
+
+  .draft-summary-row .panel .body {
+    padding: 10px 14px 12px;
+  }
+
+  .draft-summary-row table {
+    font-size: 12px;
+  }
+
+  .corr-compact {
+    margin-top: 10px;
+    border-top: 1px solid #242936;
+    padding-top: 8px;
+  }
+
+  .corr-compact summary {
+    color: #9db7ff;
+    cursor: pointer;
+    font-size: 12px;
+    user-select: none;
+  }
+
+  .corr-compact table {
+    margin-top: 8px;
+  }
+
+  .draft-output-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--draft-gap);
+    margin-top: var(--draft-gap);
+  }
+
+  .draft-output-stack > .panel {
+    margin-top: 0 !important;
+  }
+
+  #comboRows td:nth-child(6),
+  #comboRows th:nth-child(6),
+  #comboRows + tr,
+  .combo-table th:nth-child(6),
+  .combo-table td:nth-child(6) {
+    display: none;
+  }
+
+  .combo-table {
+    min-width: 760px;
+  }
+
+  .combo-table td.unreachable {
+    color: #ffb4bf;
+    font-size: 12px;
+  }
+
+  .log {
+    margin-top: 0;
+    min-height: 112px;
+    font-size: 14px;
+  }
+
+  @media (max-width: 1280px) {
+    main > section.panel:first-of-type .body {
+      grid-template-columns: repeat(3, minmax(180px, 1fr));
+    }
+    main > section.panel:first-of-type .body > *,
+    main > section.panel:first-of-type .body > .row > label {
+      grid-column: auto !important;
+      grid-row: auto !important;
+    }
+    main > section.panel:first-of-type .body > .row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    main > section.panel:first-of-type .body > label:nth-child(1),
+    main > section.panel:first-of-type .body > label:nth-child(2),
+    main > section.panel:first-of-type .body > label:nth-child(9),
+    main > section.panel:first-of-type #selectedUnderlyings,
+    main > section.panel:first-of-type #runBtn,
+    main > section.panel:first-of-type #comboBtn,
+    main > section.panel:first-of-type .help {
+      grid-column: 1 / -1;
+    }
+    .draft-summary-row {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 760px) {
+    main {
+      padding: 12px;
+    }
+    main > section.panel:first-of-type .body {
+      display: block;
+    }
+    main > section.panel:first-of-type .body > * {
+      margin-bottom: 10px !important;
+    }
+    .draft-summary-row .kpis {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
 </head>
 <body>
 <header>
@@ -64,6 +400,11 @@
     <div class="body">
       <label>Search underlying
         <input id="ricSearch" placeholder="AAPL, MSFT, NVDA">
+      </label>
+      <label>Market filter
+        <select id="marketFilter">
+          <option value="ALL">All markets</option>
+        </select>
       </label>
       <label>Underlying (multi-select, worst-of)
         <select id="rics" multiple></select>
@@ -157,7 +498,7 @@
       </div>
       <button id="comboBtn">Run Combo Analysis</button>
       <div class="help">
-        HSP is the simulated probability of no KO, terminal worst-of below Strike, and KI triggered. Historical adj_close data is loaded from this project's data lake.
+        HSP is the simulated probability of no KO, terminal worst-of below Strike, and KI triggered. Historical adj_close data is loaded from this project's multi-market data lake.
       </div>
     </div>
   </section>
@@ -173,7 +514,7 @@
     <div class="grid">
       <div class="panel">
         <h2>Estimated Parameters</h2>
-        <div class="body"><table><thead><tr><th>RIC</th><th>Name</th><th class="num">S0</th><th class="num">Ann. Vol</th></tr></thead><tbody id="paramRows"></tbody></table></div>
+        <div class="body"><table><thead><tr><th>Market</th><th>RIC</th><th>Name</th><th class="num">S0</th><th class="num">KO Price</th><th class="num">KI Price</th><th class="num">Ann. Vol</th></tr></thead><tbody id="paramRows"></tbody></table></div>
       </div>
       <div class="panel">
         <h2>Correlation Matrix</h2>
@@ -220,6 +561,7 @@ function esc(s) {
 }
 function pct(x){ return Number.isFinite(x) ? (x * 100).toFixed(2) + "%" : "-"; }
 function num(x, d){ return Number.isFinite(x) ? x.toFixed(d == null ? 2 : d) : "-"; }
+function money(x){ return Number.isFinite(x) ? x.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : "-"; }
 function mean(xs){ return xs.reduce(function(a,b){ return a+b; }, 0) / xs.length; }
 function std(xs) {
   var m = mean(xs);
@@ -240,7 +582,9 @@ function renderSelectedUnderlyings(existingSelection) {
   }
   box.innerHTML = selected.map(function(ric) {
     var meta = HSP_DATA.meta[ric] || {};
-    var label = ric + (meta.name ? " - " + meta.name : "");
+    var tag = meta.market ? "[" + meta.market + "] " : "";
+    var name = meta.name || meta.nameEn || "";
+    var label = tag + ric + (name ? " - " + name : "");
     return '<span class="selected-chip" title="' + esc(label) + '">' + esc(label) +
       '<button type="button" data-ric="' + esc(ric) + '" aria-label="Remove ' + esc(ric) + '">x</button></span>';
   }).join("");
@@ -251,6 +595,7 @@ function renderSelectedUnderlyings(existingSelection) {
       });
       SELECTED_RICS.delete(btn.dataset.ric);
       renderSelectedUnderlyings();
+      populateRicSelect(document.getElementById("ricSearch").value);
     });
   });
 }
@@ -262,17 +607,25 @@ function populateRicSelect(filter) {
   if (!selected.size) DEFAULT_RICS.forEach(function(r){ selected.add(r); });
   SELECTED_RICS = new Set(selected);
   var q = filter.trim().toLowerCase();
+  var market = document.getElementById("marketFilter")?.value || "ALL";
   var rics = Object.keys(HSP_DATA.series).filter(function(ric) {
+    if (selected.has(ric)) return false;
     var meta = HSP_DATA.meta[ric] || {};
-    return !q || ric.toLowerCase().indexOf(q) >= 0 || String(meta.name || "").toLowerCase().indexOf(q) >= 0;
+    if (market !== "ALL" && meta.market !== market) return false;
+    return !q ||
+      ric.toLowerCase().indexOf(q) >= 0 ||
+      String(meta.name || "").toLowerCase().indexOf(q) >= 0 ||
+      String(meta.nameEn || "").toLowerCase().indexOf(q) >= 0;
   }).slice(0, 180);
   select.innerHTML = "";
   rics.forEach(function(ric) {
     var meta = HSP_DATA.meta[ric] || {};
     var option = document.createElement("option");
     option.value = ric;
-    option.textContent = ric + " - " + (meta.name || ric);
-    option.selected = selected.has(ric);
+    var name = meta.name || ric;
+    var nameEn = meta.nameEn && meta.nameEn !== meta.name ? " / " + meta.nameEn : "";
+    option.textContent = "[" + (meta.market || "-") + "] " + ric + " - " + name + nameEn;
+    option.selected = false;
     select.appendChild(option);
   });
   renderSelectedUnderlyings(selected);
@@ -366,11 +719,14 @@ function estimate(rics, lookbackDays) {
   });
   return { vols: vols, corrMat: corrMat, spots: spots, sampleDays: aligned.length };
 }
-function renderParams(rics, est) {
+function renderParams(rics, est, koLevel, kiLevel) {
   document.getElementById("paramRows").innerHTML = rics.map(function(ric, i) {
     var meta = HSP_DATA.meta[ric] || {};
-    return "<tr><td>" + esc(ric) + "</td><td>" + esc(meta.name || "-") + "</td><td class=\"num\">" +
-      num(est.spots[i]) + "</td><td class=\"num\">" + pct(est.vols[i]) + "</td></tr>";
+    var name = meta.name || meta.nameEn || "-";
+    return "<tr><td>" + esc(meta.market || "-") + "</td><td>" + esc(ric) + "</td><td>" + esc(name) + "</td><td class=\"num\">" +
+      num(est.spots[i]) + "</td><td class=\"num\">" + money(est.spots[i] * koLevel) +
+      "</td><td class=\"num\">" + money(est.spots[i] * kiLevel) +
+      "</td><td class=\"num\">" + pct(est.vols[i]) + "</td></tr>";
   }).join("");
   var head = "<tr><th></th>" + rics.map(function(r){ return '<th class="num">' + esc(r) + "</th>"; }).join("") + "</tr>";
   var body = rics.map(function(r, i) {
@@ -401,7 +757,7 @@ function simulate() {
   var targetHsp = Number(document.getElementById("targetHsp").value) / 100;
 
   var est = estimate(rics, lookbackDays);
-  renderParams(rics, est);
+  renderParams(rics, est, ko0, ki);
   var l = cholesky(est.corrMat);
   var rand = rng(20260505);
   var n = rics.length;
@@ -487,11 +843,18 @@ function simulate() {
   var modeLine = calcMode === "strike"
     ? "Mode: target HSP " + pct(targetHsp) + " to Strike" + (impossibleTarget ? " (target above reachable maximum)" : " = " + pct(solvedStrike)) + "\n"
     : "Mode: Strike " + pct(strike) + " to HSP\n";
+  var marketLine = rics.map(function(ric) {
+    var meta = HSP_DATA.meta[ric] || {};
+    return (meta.market || "-") + ":" + ric;
+  }).join(", ");
+  var sampleNote = Number.isFinite(lookbackDays) && est.sampleDays < lookbackDays
+    ? " (limited by common trading-day overlap)"
+    : "";
   document.getElementById("log").textContent =
     "Data date: " + HSP_DATA.asOf + "\n" +
-    "Underlying: " + rics.join(", ") + "\n" +
+    "Underlying: " + marketLine + "\n" +
     modeLine +
-    "Estimation window: " + lookbackLabel(lookbackDays) + "; common sample: " + est.sampleDays + " trading days\n" +
+    "Estimation window: " + lookbackLabel(lookbackDays) + "; common sample: " + est.sampleDays + " trading days" + sampleNote + "\n" +
     "Simulation tenor: " + days + " trading days; paths: " + paths.toLocaleString() + "\n" +
     "Event counts: HSP " + hsp.toLocaleString() + ", KO " + koCount.toLocaleString() +
     ", KI triggered and not KO " + kiCount.toLocaleString() + ".";
@@ -594,6 +957,9 @@ function comboCount(n, k) {
 
 function attachEvents() {
   document.getElementById("ricSearch").addEventListener("input", function(e){ populateRicSelect(e.target.value); });
+  document.getElementById("marketFilter").addEventListener("change", function(){
+    populateRicSelect(document.getElementById("ricSearch").value);
+  });
   document.getElementById("rics").addEventListener("mousedown", function(e) {
     if (e.target.tagName !== "OPTION") return;
     e.preventDefault();
@@ -605,9 +971,10 @@ function attachEvents() {
       e.target.selected = true;
     }
     renderSelectedUnderlyings();
+    populateRicSelect(document.getElementById("ricSearch").value);
   });
-  document.getElementById("rics").addEventListener("input", function(){ renderSelectedUnderlyings(); });
-  document.getElementById("rics").addEventListener("change", function(){ renderSelectedUnderlyings(); });
+  document.getElementById("rics").addEventListener("input", function(){ renderSelectedUnderlyings(); populateRicSelect(document.getElementById("ricSearch").value); });
+  document.getElementById("rics").addEventListener("change", function(){ renderSelectedUnderlyings(); populateRicSelect(document.getElementById("ricSearch").value); });
   document.getElementById("runBtn").addEventListener("click", function() {
     try { simulate(); }
     catch (err) { document.getElementById("log").textContent = err.message || String(err); }
@@ -623,6 +990,13 @@ async function loadHspData() {
     const res = await fetch("data/hsp_prices.json", { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     HSP_DATA = await res.json();
+    var marketFilter = document.getElementById("marketFilter");
+    (HSP_DATA.markets || []).forEach(function(m) {
+      var option = document.createElement("option");
+      option.value = m.market;
+      option.textContent = m.market + " - " + m.indexName;
+      marketFilter.appendChild(option);
+    });
     document.getElementById("log").textContent =
       "Data date: " + HSP_DATA.asOf + "; available RICs: " + HSP_DATA.count + ".";
     attachEvents();
@@ -637,5 +1011,248 @@ async function loadHspData() {
 
 loadHspData();
 </script>
+
+<script id="hsp-draft-layout-js">
+(function() {
+  var draftPopulatingRicList = false;
+
+  function currentRicSearch() {
+    var input = document.getElementById("ricSearch");
+    return input ? input.value : "";
+  }
+
+  if (typeof populateRicSelect === "function" && typeof renderSelectedUnderlyings === "function") {
+    var originalRenderSelectedUnderlyings = renderSelectedUnderlyings;
+
+    populateRicSelect = function(filter) {
+      filter = filter || "";
+      var select = document.getElementById("rics");
+      if (!select || !HSP_DATA) return;
+
+      var selected = new Set(selectedRics());
+      var q = filter.trim().toLowerCase();
+      var market = document.getElementById("marketFilter")?.value || "ALL";
+      var rics = Object.keys(HSP_DATA.series).filter(function(ric) {
+        if (selected.has(ric)) return false;
+        var meta = HSP_DATA.meta[ric] || {};
+        if (market !== "ALL" && meta.market !== market) return false;
+        return !q ||
+          ric.toLowerCase().indexOf(q) >= 0 ||
+          String(meta.name || "").toLowerCase().indexOf(q) >= 0 ||
+          String(meta.nameEn || "").toLowerCase().indexOf(q) >= 0;
+      }).slice(0, 180);
+
+      select.innerHTML = "";
+      rics.forEach(function(ric) {
+        var meta = HSP_DATA.meta[ric] || {};
+        var option = document.createElement("option");
+        option.value = ric;
+        var name = meta.name || ric;
+        var nameEn = meta.nameEn && meta.nameEn !== meta.name ? " / " + meta.nameEn : "";
+        option.textContent = "[" + (meta.market || "-") + "] " + ric + " - " + name + nameEn;
+        option.selected = false;
+        select.appendChild(option);
+      });
+
+      draftPopulatingRicList = true;
+      originalRenderSelectedUnderlyings(selected);
+      draftPopulatingRicList = false;
+      bindSelectedChipRefresh();
+    };
+
+    renderSelectedUnderlyings = function(existingSelection) {
+      originalRenderSelectedUnderlyings.apply(this, arguments);
+      bindSelectedChipRefresh();
+      if (!draftPopulatingRicList) {
+        setTimeout(function() { populateRicSelect(currentRicSearch()); }, 0);
+      }
+    };
+  }
+
+  function bindSelectedChipRefresh() {
+    var box = document.getElementById("selectedUnderlyings");
+    if (!box || box.dataset.draftChipRefresh === "1") return;
+    box.dataset.draftChipRefresh = "1";
+    box.addEventListener("click", function(e) {
+      if (e.target && e.target.matches("button[data-ric]")) {
+        setTimeout(function() { populateRicSelect(currentRicSearch()); }, 0);
+      }
+    });
+  }
+
+  function panelByTitle(title) {
+    return Array.from(document.querySelectorAll(".panel")).find(function(panel) {
+      var h2 = panel.querySelector("h2");
+      return h2 && h2.textContent.trim().indexOf(title) >= 0;
+    });
+  }
+
+  function setupDraftLayout() {
+    var main = document.querySelector("main");
+    if (!main || main.dataset.draftReady === "1") return;
+    main.dataset.draftReady = "1";
+
+    var resultSection = Array.from(main.children).find(function(el) {
+      return el.tagName === "SECTION" && !el.classList.contains("panel");
+    });
+    if (!resultSection) return;
+
+    var kpis = resultSection.querySelector(".kpis");
+    var estPanel = panelByTitle("Estimated Parameters");
+    var corrPanel = panelByTitle("Correlation Matrix");
+    var notesPanel = panelByTitle("Result Notes");
+    var comboPanel = panelByTitle("Combo Analysis");
+
+    if (kpis && estPanel) {
+      var summaryRow = document.createElement("div");
+      summaryRow.className = "draft-summary-row";
+      resultSection.insertBefore(summaryRow, resultSection.firstChild);
+      summaryRow.appendChild(kpis);
+      summaryRow.appendChild(estPanel);
+    }
+
+    var hspCard = document.getElementById("hsp")?.closest(".kpi");
+    var koCard = document.getElementById("koProb")?.closest(".kpi");
+    if (hspCard && koCard && !hspCard.querySelector(".submetric")) {
+      var koLine = document.createElement("div");
+      koLine.className = "submetric";
+      koLine.innerHTML = '<span>KO Probability</span>';
+      koLine.appendChild(document.getElementById("koProb"));
+      hspCard.appendChild(koLine);
+      koCard.remove();
+    }
+
+    ["stderr", "ci"].forEach(function(id) {
+      var card = document.getElementById(id)?.closest(".kpi");
+      if (card) card.classList.add("is-hidden");
+    });
+
+    if (corrPanel && estPanel) {
+      var corrTable = corrPanel.querySelector("#corrTbl");
+      var estBody = estPanel.querySelector(".body");
+      if (corrTable && estBody && !estBody.querySelector(".corr-compact")) {
+        var details = document.createElement("details");
+        details.className = "corr-compact";
+        details.innerHTML = "<summary>Correlation Matrix</summary>";
+        details.appendChild(corrTable);
+        estBody.appendChild(details);
+      }
+      corrPanel.remove();
+    }
+
+    if (comboPanel) {
+      var comboTable = comboPanel.querySelector("table");
+      if (comboTable) comboTable.classList.add("combo-table");
+    }
+
+    if (notesPanel && comboPanel) {
+      var stack = document.createElement("div");
+      stack.className = "draft-output-stack";
+      resultSection.appendChild(stack);
+      stack.appendChild(notesPanel);
+      stack.appendChild(comboPanel);
+    }
+  }
+
+  function bringOutputToTop(which) {
+    var stack = document.querySelector(".draft-output-stack");
+    if (!stack) return;
+    var target = which === "combo" ? panelByTitle("Combo Analysis") : panelByTitle("Result Notes");
+    if (target) stack.insertBefore(target, stack.firstChild);
+  }
+
+  function parsePctText(text) {
+    var value = Number(String(text || "").replace("%", "").trim());
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function setMetricText(id, text, pctForColor) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text || "-";
+    if (id === "hsp" && pctForColor != null) {
+      el.className = "value " + (pctForColor >= 20 ? "neg" : "pos");
+    }
+  }
+
+  function syncComboSummaryMetric() {
+    var mode = document.getElementById("calcMode")?.value || "hsp";
+    var rows = Array.from(document.querySelectorAll("#comboRows tr")).map(function(tr) {
+      var cells = Array.from(tr.children).map(function(td) { return td.textContent.trim(); });
+      return {
+        underlyings: cells[1],
+        hsp: cells[2],
+        strike: cells[3],
+        ko: cells[4],
+        hspValue: parsePctText(cells[2]),
+        strikeValue: parsePctText(cells[3])
+      };
+    }).filter(function(row) {
+      return row.underlyings && row.hsp !== "ERR";
+    });
+    if (!rows.length) return;
+
+    var metricKey = mode === "strike" ? "strikeValue" : "hspValue";
+    var chosen = rows.filter(function(row) {
+      return row[metricKey] != null;
+    }).sort(function(a, b) {
+      return a[metricKey] - b[metricKey];
+    })[0];
+    if (!chosen) return;
+
+    setMetricText("hsp", chosen.hsp, chosen.hspValue);
+    setMetricText("solvedStrike", chosen.strike);
+    setMetricText("koProb", chosen.ko);
+
+    var log = document.getElementById("log");
+    if (log) {
+      var metricLabel = mode === "strike" ? "lowest solved strike" : "lowest HSP";
+      log.textContent = "Combo summary uses " + metricLabel + " from: " + chosen.underlyings + "\n" + log.textContent;
+    }
+  }
+
+  function annotateUnreachableComboRows() {
+    var mode = document.getElementById("calcMode")?.value || "hsp";
+    if (mode !== "strike") return;
+    Array.from(document.querySelectorAll("#comboRows tr")).forEach(function(tr) {
+      var cells = Array.from(tr.children);
+      if (cells.length < 5) return;
+      var hspText = cells[2].textContent.trim();
+      var strikeText = cells[3].textContent.trim();
+      if (strikeText !== "N/A") return;
+      cells[3].classList.add("unreachable");
+      cells[3].textContent = "N/A - max HSP " + hspText;
+      cells[3].title = "Target HSP is above this combo's maximum reachable HSP under the current KI/KO settings.";
+    });
+  }
+
+  setupDraftLayout();
+
+  var originalSimulate = window.simulate;
+  if (typeof originalSimulate === "function") {
+    window.simulate = function() {
+      var out = originalSimulate.apply(this, arguments);
+      setupDraftLayout();
+      bringOutputToTop("notes");
+      return out;
+    };
+  }
+
+  var originalCombo = window.runComboAnalysis;
+  if (typeof originalCombo === "function") {
+    window.runComboAnalysis = function() {
+      var out = originalCombo.apply(this, arguments);
+      setupDraftLayout();
+      annotateUnreachableComboRows();
+      syncComboSummaryMetric();
+      bringOutputToTop("combo");
+      return out;
+    };
+  }
+
+  window.addEventListener("load", setupDraftLayout);
+})();
+</script>
+
 </body>
 </html>
