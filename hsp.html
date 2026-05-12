@@ -34,6 +34,11 @@
   details.manual-combo summary { cursor:pointer; color:#dbe2f5; font-size:13px; font-weight:650; }
   details.manual-combo .manual-combo-inner { margin-top:10px; }
   .manual-combo-actions { display:grid; grid-template-columns:minmax(180px, 260px) 1fr; gap:10px; align-items:center; margin-top:8px; }
+  .calc-progress { margin-top:10px; padding:10px; border:1px solid #2a2f3a; border-radius:6px; background:#13161e; }
+  .calc-progress.is-hidden { display:none; }
+  .calc-progress-track { height:8px; overflow:hidden; border-radius:999px; background:#242936; }
+  .calc-progress-bar { width:0%; height:100%; border-radius:999px; background:#4a7cff; transition:width 120ms ease; }
+  .calc-progress-text { margin-top:6px; color:#a8b0c2; font-size:12px; font-variant-numeric:tabular-nums; }
   .kpis { display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap:10px; }
   .kpi { background:#13161e; border:1px solid #2a2f3a; border-radius:8px; padding:12px; min-height:76px; }
   .kpi .label { color:#8b93a7; font-size:12px; }
@@ -222,15 +227,21 @@
     grid-row: 7;
   }
 
+  main > section.panel:first-of-type #calcProgress {
+    grid-column: 4 / span 4;
+    grid-row: 8;
+    margin: 0;
+  }
+
   main > section.panel:first-of-type #manualComboBox {
     grid-column: 1 / -1;
-    grid-row: 8;
+    grid-row: 9;
     margin: 0;
   }
 
   main > section.panel:first-of-type .help {
     grid-column: 1 / -1;
-    grid-row: 9;
+    grid-row: 10;
     margin: 0;
     padding: 8px 10px;
   }
@@ -372,6 +383,7 @@
     main > section.panel:first-of-type #selectedUnderlyings,
     main > section.panel:first-of-type #runBtn,
     main > section.panel:first-of-type #comboBtn,
+    main > section.panel:first-of-type #calcProgress,
     main > section.panel:first-of-type #manualComboBox,
     main > section.panel:first-of-type .help {
       grid-column: 1 / -1;
@@ -511,6 +523,10 @@
         </label>
       </div>
       <button id="comboBtn">Run Combo Analysis</button>
+      <div id="calcProgress" class="calc-progress is-hidden" aria-live="polite">
+        <div class="calc-progress-track"><div id="calcProgressBar" class="calc-progress-bar"></div></div>
+        <div id="calcProgressText" class="calc-progress-text">Ready</div>
+      </div>
       <details id="manualComboBox" class="manual-combo">
         <summary>Manual combo input</summary>
         <div class="manual-combo-inner">
@@ -912,6 +928,29 @@ function setSelectedRics(rics) {
   renderSelectedUnderlyings(want);
 }
 
+function nextPaint() {
+  return new Promise(function(resolve) {
+    requestAnimationFrame(function() { setTimeout(resolve, 0); });
+  });
+}
+
+function setCalcProgress(done, total, label) {
+  var box = document.getElementById("calcProgress");
+  var bar = document.getElementById("calcProgressBar");
+  var text = document.getElementById("calcProgressText");
+  if (!box || !bar || !text) return;
+  total = Math.max(1, total || 1);
+  done = Math.max(0, Math.min(total, done || 0));
+  var pctDone = Math.round(done / total * 100);
+  box.classList.remove("is-hidden");
+  bar.style.width = pctDone + "%";
+  text.textContent = (label || "Calculating") + " " + done + " / " + total + " (" + pctDone + "%)";
+}
+
+function resetCalcProgress(label) {
+  setCalcProgress(0, 1, label || "Preparing");
+}
+
 function buildRicAliasIndex() {
   var aliases = new Map();
   Object.keys(HSP_DATA.series || {}).forEach(function(ric) {
@@ -988,7 +1027,7 @@ function renderComboRows(rows) {
   }).join("");
 }
 
-function runManualComboAnalysis() {
+async function runManualComboAnalysis() {
   var text = document.getElementById("manualComboText").value;
   var parsed = parseManualCombos(text);
   var body = document.getElementById("comboRows");
@@ -1000,6 +1039,8 @@ function runManualComboAnalysis() {
   }
 
   body.innerHTML = '<tr><td colspan="6" class="muted">Running ' + parsed.combos.length + ' manual combo(s)...</td></tr>';
+  resetCalcProgress("Manual combo");
+  await nextPaint();
   var original = selectedRics();
   var rows = parsed.errors.map(function(err) {
     return { idx: err.idx, rics: err.input, hsp: "ERR", strike: "-", ko: "-", se: err.message };
@@ -1007,8 +1048,11 @@ function runManualComboAnalysis() {
 
   for (var i = 0; i < parsed.combos.length; i++) {
     var combo = parsed.combos[i];
+    setCalcProgress(i, parsed.combos.length, "Manual combo");
+    await nextPaint();
     if (combo.rics.length > 6) {
       rows.push({ idx: combo.idx, rics: combo.rics.join(", "), hsp: "ERR", strike: "-", ko: "-", se: "Maximum 6 underlyings per combo." });
+      setCalcProgress(i + 1, parsed.combos.length, "Manual combo");
       continue;
     }
     setSelectedRics(combo.rics);
@@ -1032,6 +1076,7 @@ function runManualComboAnalysis() {
         se: err.message || String(err)
       });
     }
+    setCalcProgress(i + 1, parsed.combos.length, "Manual combo");
   }
 
   setSelectedRics(original);
@@ -1046,7 +1091,7 @@ function runManualComboAnalysis() {
     (parsed.errors.length ? "\nParse errors: " + parsed.errors.length + "." : "");
 }
 
-function runComboAnalysis() {
+async function runComboAnalysis() {
   var original = selectedRics();
   var size = Number(document.getElementById("comboSize").value);
   var maxCombos = Math.max(1, Math.floor(Number(document.getElementById("comboMax").value) || 50));
@@ -1059,9 +1104,13 @@ function runComboAnalysis() {
   var totalPossible = comboCount(original.length, size);
   body.innerHTML = '<tr><td colspan="6" class="muted">Running ' + combos.length +
     ' combo(s) out of ' + totalPossible + ' possible...</td></tr>';
+  resetCalcProgress("Combo");
+  await nextPaint();
 
   var rows = [];
   for (var i = 0; i < combos.length; i++) {
+    setCalcProgress(i, combos.length, "Combo");
+    await nextPaint();
     setSelectedRics(combos[i]);
     try {
       simulate();
@@ -1083,6 +1132,7 @@ function runComboAnalysis() {
         se: err.message || String(err)
       });
     }
+    setCalcProgress(i + 1, combos.length, "Combo");
   }
 
   setSelectedRics(original);
@@ -1132,11 +1182,11 @@ function attachEvents() {
     catch (err) { document.getElementById("log").textContent = err.message || String(err); }
   });
   document.getElementById("comboBtn").addEventListener("click", function() {
-    try { runComboAnalysis(); }
+    try { runComboAnalysis().catch(function(err) { document.getElementById("log").textContent = err.message || String(err); }); }
     catch (err) { document.getElementById("log").textContent = err.message || String(err); }
   });
   document.getElementById("manualComboBtn").addEventListener("click", function() {
-    try { runManualComboAnalysis(); }
+    try { runManualComboAnalysis().catch(function(err) { document.getElementById("log").textContent = err.message || String(err); }); }
     catch (err) { document.getElementById("log").textContent = err.message || String(err); }
   });
 }
@@ -1398,10 +1448,12 @@ loadHspData();
   if (typeof originalCombo === "function") {
     window.runComboAnalysis = function() {
       var out = originalCombo.apply(this, arguments);
-      setupDraftLayout();
-      annotateUnreachableComboRows();
-      syncComboSummaryMetric();
-      bringOutputToTop("combo");
+      Promise.resolve(out).then(function() {
+        setupDraftLayout();
+        annotateUnreachableComboRows();
+        syncComboSummaryMetric();
+        bringOutputToTop("combo");
+      });
       return out;
     };
   }
@@ -1410,10 +1462,12 @@ loadHspData();
   if (typeof originalManualCombo === "function") {
     window.runManualComboAnalysis = function() {
       var out = originalManualCombo.apply(this, arguments);
-      setupDraftLayout();
-      annotateUnreachableComboRows();
-      syncComboSummaryMetric();
-      bringOutputToTop("combo");
+      Promise.resolve(out).then(function() {
+        setupDraftLayout();
+        annotateUnreachableComboRows();
+        syncComboSummaryMetric();
+        bringOutputToTop("combo");
+      });
       return out;
     };
   }
