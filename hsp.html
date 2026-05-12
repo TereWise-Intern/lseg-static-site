@@ -18,8 +18,9 @@
   .panel h2 { margin:0; padding:12px 14px; border-bottom:1px solid #2a2f3a; font-size:14px; color:#dbe2f5; }
   .body { padding:14px; }
   label { display:block; margin:0 0 10px; font-size:12px; color:#a8b0c2; }
-  input, select, button { width:100%; margin-top:5px; background:#1c2030; color:#e4e6eb; border:1px solid #2a2f3a; border-radius:4px; padding:7px 9px; font-size:13px; }
+  input, select, button, textarea { width:100%; margin-top:5px; background:#1c2030; color:#e4e6eb; border:1px solid #2a2f3a; border-radius:4px; padding:7px 9px; font-size:13px; }
   select[multiple] { height:190px; }
+  textarea { min-height:120px; resize:vertical; font-family:Consolas, "SFMono-Regular", monospace; line-height:1.45; }
   button { cursor:pointer; font-weight:650; }
   button.primary { background:#2d4a8a; border-color:#4a7cff; color:#fff; }
   button:hover { background:#252b3d; }
@@ -29,6 +30,10 @@
   .selected-chip { display:inline-flex; align-items:center; gap:6px; padding:5px 8px; border:1px solid #2a2f3a; border-radius:999px; background:#1c2030; color:#dbe2f5; font-size:12px; max-width:100%; }
   .selected-chip button { width:auto; margin:0; padding:0 2px; border:0; background:transparent; color:#8b93a7; font-size:14px; line-height:1; }
   .selected-chip button:hover { color:#fff; background:transparent; }
+  details.manual-combo { margin-top:10px; padding:10px; border:1px solid #2a2f3a; border-radius:6px; background:#13161e; }
+  details.manual-combo summary { cursor:pointer; color:#dbe2f5; font-size:13px; font-weight:650; }
+  details.manual-combo .manual-combo-inner { margin-top:10px; }
+  .manual-combo-actions { display:grid; grid-template-columns:minmax(180px, 260px) 1fr; gap:10px; align-items:center; margin-top:8px; }
   .kpis { display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap:10px; }
   .kpi { background:#13161e; border:1px solid #2a2f3a; border-radius:8px; padding:12px; min-height:76px; }
   .kpi .label { color:#8b93a7; font-size:12px; }
@@ -45,6 +50,7 @@
   @media (max-width: 980px) {
     main { grid-template-columns:1fr; padding:12px; }
     .kpis, .grid { grid-template-columns:1fr; }
+    .manual-combo-actions { grid-template-columns:1fr; }
     header { padding:10px 12px; }
   }
 </style>
@@ -216,9 +222,15 @@
     grid-row: 7;
   }
 
-  main > section.panel:first-of-type .help {
+  main > section.panel:first-of-type #manualComboBox {
     grid-column: 1 / -1;
     grid-row: 8;
+    margin: 0;
+  }
+
+  main > section.panel:first-of-type .help {
+    grid-column: 1 / -1;
+    grid-row: 9;
     margin: 0;
     padding: 8px 10px;
   }
@@ -360,6 +372,7 @@
     main > section.panel:first-of-type #selectedUnderlyings,
     main > section.panel:first-of-type #runBtn,
     main > section.panel:first-of-type #comboBtn,
+    main > section.panel:first-of-type #manualComboBox,
     main > section.panel:first-of-type .help {
       grid-column: 1 / -1;
     }
@@ -497,6 +510,16 @@
         </label>
       </div>
       <button id="comboBtn">Run Combo Analysis</button>
+      <details id="manualComboBox" class="manual-combo">
+        <summary>Manual combo input</summary>
+        <div class="manual-combo-inner">
+          <textarea id="manualComboText" spellcheck="false" placeholder="1 EWT+TSM+NVDA+AAPL&#10;2 EWT+TSM+NVDA+MSFT"></textarea>
+          <div class="manual-combo-actions">
+            <button id="manualComboBtn" type="button">Run Manual Combos</button>
+            <span id="manualComboStatus" class="muted">One combo per line. Ticker symbols such as AAPL, TSM, QQQ are resolved to available RICs.</span>
+          </div>
+        </div>
+      </details>
       <div class="help">
         HSP is the simulated probability of no KO, terminal worst-of below Strike, and KI triggered. Historical adj_close data is loaded from this project's multi-market data lake.
       </div>
@@ -888,6 +911,140 @@ function setSelectedRics(rics) {
   renderSelectedUnderlyings(want);
 }
 
+function buildRicAliasIndex() {
+  var aliases = new Map();
+  Object.keys(HSP_DATA.series || {}).forEach(function(ric) {
+    var upperRic = ric.toUpperCase();
+    var root = upperRic.split(".")[0];
+    var candidates = [upperRic, root];
+    if (upperRic.endsWith(".OQ")) candidates.push(root + ".O");
+    candidates.forEach(function(alias) {
+      if (!aliases.has(alias)) aliases.set(alias, []);
+      aliases.get(alias).push(ric);
+    });
+  });
+  return aliases;
+}
+
+function resolveManualToken(token, aliases) {
+  var cleaned = String(token || "").trim().toUpperCase();
+  cleaned = cleaned.replace(/^[\s"'`]+|[\s"'`,;]+$/g, "");
+  if (!cleaned) return null;
+  if (HSP_DATA.series[cleaned]) return cleaned;
+  var matches = aliases.get(cleaned) || [];
+  if (matches.length === 1) return matches[0];
+  if (matches.length > 1) {
+    var usMatches = matches.filter(function(ric) {
+      return (HSP_DATA.meta[ric] || {}).market === "US";
+    });
+    if (usMatches.length === 1) return usMatches[0];
+    throw new Error("Ambiguous ticker " + cleaned + ": " + matches.join(", "));
+  }
+  if (!cleaned.includes(".")) {
+    var suffixes = [".OQ", ".N", ".P", ".T", ".HK"];
+    for (var i = 0; i < suffixes.length; i++) {
+      var ric = cleaned + suffixes[i];
+      if (HSP_DATA.series[ric]) return ric;
+    }
+  }
+  throw new Error("Unknown ticker/RIC " + cleaned);
+}
+
+function parseManualCombos(text) {
+  var aliases = buildRicAliasIndex();
+  var combos = [];
+  var errors = [];
+  String(text || "").split(/\r?\n/).forEach(function(line, idx) {
+    var raw = line.trim();
+    if (!raw) return;
+    var labelMatch = raw.match(/^(\d+)[\.)]?\s+(.*)$/);
+    var label = labelMatch ? labelMatch[1] : String(combos.length + errors.length + 1);
+    var body = labelMatch ? labelMatch[2] : raw;
+    var parts = body.split("+").map(function(x){ return x.trim(); }).filter(Boolean);
+    if (!parts.length) return;
+    try {
+      var rics = parts.map(function(token){ return resolveManualToken(token, aliases); });
+      var unique = [];
+      rics.forEach(function(ric) {
+        if (unique.indexOf(ric) < 0) unique.push(ric);
+      });
+      combos.push({ idx: label, rics: unique, input: body });
+    } catch (err) {
+      errors.push({ idx: label, input: body, message: err.message || String(err) });
+    }
+  });
+  return { combos: combos, errors: errors };
+}
+
+function renderComboRows(rows) {
+  var body = document.getElementById("comboRows");
+  body.innerHTML = rows.map(function(row) {
+    return "<tr><td>" + esc(row.idx) + "</td><td>" + esc(row.rics) + "</td>" +
+      '<td class="num">' + esc(row.hsp) + "</td>" +
+      '<td class="num">' + esc(row.strike) + "</td>" +
+      '<td class="num">' + esc(row.ko) + "</td>" +
+      '<td class="num">' + esc(row.se) + "</td></tr>";
+  }).join("");
+}
+
+function runManualComboAnalysis() {
+  var text = document.getElementById("manualComboText").value;
+  var parsed = parseManualCombos(text);
+  var body = document.getElementById("comboRows");
+  var status = document.getElementById("manualComboStatus");
+  if (!parsed.combos.length && !parsed.errors.length) {
+    body.innerHTML = '<tr><td colspan="6" class="muted">Paste one combo per line, then run manual combos.</td></tr>';
+    if (status) status.textContent = "No manual combos entered.";
+    return;
+  }
+
+  body.innerHTML = '<tr><td colspan="6" class="muted">Running ' + parsed.combos.length + ' manual combo(s)...</td></tr>';
+  var original = selectedRics();
+  var rows = parsed.errors.map(function(err) {
+    return { idx: err.idx, rics: err.input, hsp: "ERR", strike: "-", ko: "-", se: err.message };
+  });
+
+  for (var i = 0; i < parsed.combos.length; i++) {
+    var combo = parsed.combos[i];
+    if (combo.rics.length > 6) {
+      rows.push({ idx: combo.idx, rics: combo.rics.join(", "), hsp: "ERR", strike: "-", ko: "-", se: "Maximum 6 underlyings per combo." });
+      continue;
+    }
+    setSelectedRics(combo.rics);
+    try {
+      simulate();
+      rows.push({
+        idx: combo.idx,
+        rics: combo.rics.join(", "),
+        hsp: document.getElementById("hsp").textContent,
+        strike: document.getElementById("solvedStrike").textContent,
+        ko: document.getElementById("koProb").textContent,
+        se: document.getElementById("stderr").textContent
+      });
+    } catch (err) {
+      rows.push({
+        idx: combo.idx,
+        rics: combo.rics.join(", "),
+        hsp: "ERR",
+        strike: "-",
+        ko: "-",
+        se: err.message || String(err)
+      });
+    }
+  }
+
+  setSelectedRics(original);
+  renderComboRows(rows.sort(function(a, b){ return Number(a.idx) - Number(b.idx); }));
+  var okCount = rows.filter(function(row){ return row.hsp !== "ERR"; }).length;
+  if (status) {
+    status.textContent = "Completed " + okCount + " combo(s)" +
+      (parsed.errors.length ? "; " + parsed.errors.length + " parse error(s)." : ".");
+  }
+  document.getElementById("log").textContent =
+    "Manual combo analysis completed for " + okCount + " combo(s)." +
+    (parsed.errors.length ? "\nParse errors: " + parsed.errors.length + "." : "");
+}
+
 function runComboAnalysis() {
   var original = selectedRics();
   var size = Number(document.getElementById("comboSize").value);
@@ -936,13 +1093,7 @@ function runComboAnalysis() {
       original.length + " underlyings, so single-basket Calculate is skipped.";
   }
 
-  body.innerHTML = rows.map(function(row) {
-    return "<tr><td>" + row.idx + "</td><td>" + esc(row.rics) + "</td>" +
-      '<td class="num">' + esc(row.hsp) + "</td>" +
-      '<td class="num">' + esc(row.strike) + "</td>" +
-      '<td class="num">' + esc(row.ko) + "</td>" +
-      '<td class="num">' + esc(row.se) + "</td></tr>";
-  }).join("");
+  renderComboRows(rows);
 }
 
 function comboCount(n, k) {
@@ -981,6 +1132,10 @@ function attachEvents() {
   });
   document.getElementById("comboBtn").addEventListener("click", function() {
     try { runComboAnalysis(); }
+    catch (err) { document.getElementById("log").textContent = err.message || String(err); }
+  });
+  document.getElementById("manualComboBtn").addEventListener("click", function() {
+    try { runManualComboAnalysis(); }
     catch (err) { document.getElementById("log").textContent = err.message || String(err); }
   });
 }
@@ -1242,6 +1397,18 @@ loadHspData();
   if (typeof originalCombo === "function") {
     window.runComboAnalysis = function() {
       var out = originalCombo.apply(this, arguments);
+      setupDraftLayout();
+      annotateUnreachableComboRows();
+      syncComboSummaryMetric();
+      bringOutputToTop("combo");
+      return out;
+    };
+  }
+
+  var originalManualCombo = window.runManualComboAnalysis;
+  if (typeof originalManualCombo === "function") {
+    window.runManualComboAnalysis = function() {
+      var out = originalManualCombo.apply(this, arguments);
       setupDraftLayout();
       annotateUnreachableComboRows();
       syncComboSummaryMetric();
