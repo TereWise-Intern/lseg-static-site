@@ -975,6 +975,7 @@ function resolveManualToken(token, aliases) {
   var cleaned = String(token || "").trim().toUpperCase();
   cleaned = cleaned.replace(/^[\s"'`]+|[\s"'`,;]+$/g, "");
   if (!cleaned) return null;
+  if (cleaned.endsWith(".US")) cleaned = cleaned.slice(0, -3);
   if (HSP_DATA.series[cleaned]) return cleaned;
   var matches = aliases.get(cleaned) || [];
   if (matches.length === 1) return matches[0];
@@ -995,6 +996,16 @@ function resolveManualToken(token, aliases) {
   throw new Error("Unknown ticker/RIC " + cleaned);
 }
 
+function splitManualComboLine(body) {
+  var text = String(body || "").trim();
+  if (!text) return [];
+  var parts = text.split(/[+\t,]+/).map(function(x){ return x.trim(); }).filter(Boolean);
+  if (parts.length <= 1 && text.indexOf("+") < 0 && text.indexOf(",") < 0) {
+    parts = text.split(/\s+/).map(function(x){ return x.trim(); }).filter(Boolean);
+  }
+  return parts;
+}
+
 function parseManualCombos(text) {
   var aliases = buildRicAliasIndex();
   var combos = [];
@@ -1004,7 +1015,7 @@ function parseManualCombos(text) {
     if (!raw) return;
     var labelMatch = raw.match(/^(\d+)[\.)]?\s+(.*)$/);
     var body = labelMatch ? labelMatch[2] : raw;
-    var parts = body.split("+").map(function(x){ return x.trim(); }).filter(Boolean);
+    var parts = splitManualComboLine(body);
     if (!parts.length) return;
     try {
       var rics = parts.map(function(token){ return resolveManualToken(token, aliases); });
