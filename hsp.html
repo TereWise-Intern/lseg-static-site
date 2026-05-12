@@ -998,7 +998,6 @@ function parseManualCombos(text) {
     var raw = line.trim();
     if (!raw) return;
     var labelMatch = raw.match(/^(\d+)[\.)]?\s+(.*)$/);
-    var label = labelMatch ? labelMatch[1] : String(combos.length + errors.length + 1);
     var body = labelMatch ? labelMatch[2] : raw;
     var parts = body.split("+").map(function(x){ return x.trim(); }).filter(Boolean);
     if (!parts.length) return;
@@ -1008,9 +1007,9 @@ function parseManualCombos(text) {
       rics.forEach(function(ric) {
         if (unique.indexOf(ric) < 0) unique.push(ric);
       });
-      combos.push({ idx: label, rics: unique, input: body });
+      combos.push({ rics: unique, input: body });
     } catch (err) {
-      errors.push({ idx: label, input: body, message: err.message || String(err) });
+      errors.push({ input: body, message: err.message || String(err) });
     }
   });
   return { combos: combos, errors: errors };
@@ -1042,16 +1041,14 @@ async function runManualComboAnalysis() {
   resetCalcProgress("Manual combo");
   await nextPaint();
   var original = selectedRics();
-  var rows = parsed.errors.map(function(err) {
-    return { idx: err.idx, rics: err.input, hsp: "ERR", strike: "-", ko: "-", se: err.message };
-  });
+  var rows = [];
 
   for (var i = 0; i < parsed.combos.length; i++) {
     var combo = parsed.combos[i];
     setCalcProgress(i, parsed.combos.length, "Manual combo");
     await nextPaint();
     if (combo.rics.length > 6) {
-      rows.push({ idx: combo.idx, rics: combo.rics.join(", "), hsp: "ERR", strike: "-", ko: "-", se: "Maximum 6 underlyings per combo." });
+      rows.push({ rics: combo.rics.join(", "), hsp: "ERR", strike: "-", ko: "-", se: "Maximum 6 underlyings per combo." });
       setCalcProgress(i + 1, parsed.combos.length, "Manual combo");
       continue;
     }
@@ -1059,7 +1056,6 @@ async function runManualComboAnalysis() {
     try {
       simulate();
       rows.push({
-        idx: combo.idx,
         rics: combo.rics.join(", "),
         hsp: document.getElementById("hsp").textContent,
         strike: document.getElementById("solvedStrike").textContent,
@@ -1068,7 +1064,6 @@ async function runManualComboAnalysis() {
       });
     } catch (err) {
       rows.push({
-        idx: combo.idx,
         rics: combo.rics.join(", "),
         hsp: "ERR",
         strike: "-",
@@ -1080,7 +1075,11 @@ async function runManualComboAnalysis() {
   }
 
   setSelectedRics(original);
-  renderComboRows(rows.sort(function(a, b){ return Number(a.idx) - Number(b.idx); }));
+  parsed.errors.forEach(function(err) {
+    rows.push({ rics: err.input, hsp: "ERR", strike: "-", ko: "-", se: err.message });
+  });
+  rows.forEach(function(row, idx) { row.idx = idx + 1; });
+  renderComboRows(rows);
   var okCount = rows.filter(function(row){ return row.hsp !== "ERR"; }).length;
   if (status) {
     status.textContent = "Completed " + okCount + " combo(s)" +
