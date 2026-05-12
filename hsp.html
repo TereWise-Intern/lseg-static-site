@@ -49,6 +49,9 @@
   table { width:100%; border-collapse:collapse; font-size:13px; }
   th, td { padding:7px 8px; border-bottom:1px solid #242936; text-align:left; white-space:nowrap; }
   th { color:#a8b0c2; font-weight:600; background:#1c2030; }
+  th.sortable { cursor:pointer; user-select:none; }
+  th.sortable:hover { color:#fff; background:#252b3d; }
+  th.sortable .sort-mark { margin-left:4px; color:#4a7cff; font-size:11px; }
   td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
   .log { margin-top:14px; min-height:70px; white-space:pre-wrap; color:#a8b0c2; }
   .help { margin-top:14px; padding:12px 14px; background:#13161e; border-top:1px solid #2a2f3a; color:#8b93a7; font-size:12px; line-height:1.55; }
@@ -571,12 +574,12 @@
         <table>
           <thead>
             <tr>
-              <th>#</th>
-              <th>Underlyings</th>
-              <th class="num">HSP</th>
-              <th class="num">Solved Strike</th>
-              <th class="num">KO Prob.</th>
-              <th class="num">Std. Error</th>
+              <th class="sortable" data-combo-sort="idx">#<span class="sort-mark"></span></th>
+              <th class="sortable" data-combo-sort="rics">Underlyings<span class="sort-mark"></span></th>
+              <th class="num sortable" data-combo-sort="hsp">HSP<span class="sort-mark"></span></th>
+              <th class="num sortable" data-combo-sort="strike">Solved Strike<span class="sort-mark"></span></th>
+              <th class="num sortable" data-combo-sort="ko">KO Prob.<span class="sort-mark"></span></th>
+              <th class="num sortable" data-combo-sort="se">Std. Error<span class="sort-mark"></span></th>
             </tr>
           </thead>
           <tbody id="comboRows">
@@ -593,6 +596,8 @@ let HSP_DATA = null;
 const TRADING_DAYS = 252;
 const DEFAULT_RICS = ["NVDA.OQ", "AAPL.OQ", "MSFT.OQ"];
 var SELECTED_RICS = new Set(DEFAULT_RICS);
+var COMBO_ROWS = [];
+var COMBO_SORT = { key: "idx", dir: "asc" };
 
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, function(c) {
@@ -1015,15 +1020,72 @@ function parseManualCombos(text) {
   return { combos: combos, errors: errors };
 }
 
+function pctTextValue(text) {
+  var raw = String(text == null ? "" : text).trim();
+  if (!raw || raw === "-" || raw.indexOf("N/A") === 0 || raw === "ERR") return NaN;
+  var match = raw.match(/-?\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : NaN;
+}
+
+function comboSortValue(row, key) {
+  if (key === "idx") return Number(row.originalIdx || row.idx || 0);
+  if (key === "rics") return String(row.rics || "").toLowerCase();
+  return pctTextValue(row[key]);
+}
+
+function updateComboSortMarks() {
+  Array.from(document.querySelectorAll("[data-combo-sort]")).forEach(function(th) {
+    var mark = th.querySelector(".sort-mark");
+    if (!mark) return;
+    mark.textContent = th.dataset.comboSort === COMBO_SORT.key
+      ? (COMBO_SORT.dir === "asc" ? "▲" : "▼")
+      : "";
+  });
+}
+
+function sortedComboRows() {
+  var rows = COMBO_ROWS.slice();
+  var key = COMBO_SORT.key;
+  var dir = COMBO_SORT.dir === "desc" ? -1 : 1;
+  rows.sort(function(a, b) {
+    var av = comboSortValue(a, key);
+    var bv = comboSortValue(b, key);
+    var aMissing = typeof av === "number" && !Number.isFinite(av);
+    var bMissing = typeof bv === "number" && !Number.isFinite(bv);
+    if (aMissing && bMissing) return (a.originalIdx || 0) - (b.originalIdx || 0);
+    if (aMissing) return 1;
+    if (bMissing) return -1;
+    if (typeof av === "string" || typeof bv === "string") {
+      var textCmp = String(av).localeCompare(String(bv));
+      return textCmp === 0 ? (a.originalIdx || 0) - (b.originalIdx || 0) : textCmp * dir;
+    }
+    if (av === bv) return (a.originalIdx || 0) - (b.originalIdx || 0);
+    return av > bv ? dir : -dir;
+  });
+  return rows;
+}
+
 function renderComboRows(rows) {
+  COMBO_ROWS = rows.map(function(row, idx) {
+    var copy = Object.assign({}, row);
+    copy.originalIdx = row.originalIdx || idx + 1;
+    return copy;
+  });
+  renderSortedComboRows();
+}
+
+function renderSortedComboRows() {
+  var rows = sortedComboRows();
   var body = document.getElementById("comboRows");
   body.innerHTML = rows.map(function(row) {
-    return "<tr><td>" + esc(row.idx) + "</td><td>" + esc(row.rics) + "</td>" +
+    var displayIdx = rows.indexOf(row) + 1;
+    return "<tr><td>" + esc(displayIdx) + "</td><td>" + esc(row.rics) + "</td>" +
       '<td class="num">' + esc(row.hsp) + "</td>" +
       '<td class="num">' + esc(row.strike) + "</td>" +
       '<td class="num">' + esc(row.ko) + "</td>" +
       '<td class="num">' + esc(row.se) + "</td></tr>";
   }).join("");
+  updateComboSortMarks();
 }
 
 async function runManualComboAnalysis() {
@@ -1188,6 +1250,20 @@ function attachEvents() {
     try { runManualComboAnalysis().catch(function(err) { document.getElementById("log").textContent = err.message || String(err); }); }
     catch (err) { document.getElementById("log").textContent = err.message || String(err); }
   });
+  Array.from(document.querySelectorAll("[data-combo-sort]")).forEach(function(th) {
+    th.addEventListener("click", function() {
+      var key = th.dataset.comboSort;
+      if (!COMBO_ROWS.length) return;
+      if (COMBO_SORT.key === key) {
+        COMBO_SORT.dir = COMBO_SORT.dir === "asc" ? "desc" : "asc";
+      } else {
+        COMBO_SORT.key = key;
+        COMBO_SORT.dir = ["hsp", "strike", "ko", "se"].indexOf(key) >= 0 ? "desc" : "asc";
+      }
+      renderSortedComboRows();
+    });
+  });
+  updateComboSortMarks();
 }
 
 async function loadHspData() {
