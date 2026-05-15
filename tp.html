@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Target Price | Multi-market</title>
+<style>
+*{box-sizing:border-box}body{font-family:-apple-system,"Segoe UI","Microsoft JhengHei",sans-serif;margin:0;background:#0f1115;color:#e4e6eb}
+header{padding:14px 20px;border-bottom:1px solid #2a2f3a;background:#161922;position:sticky;top:0;z-index:10;display:flex;align-items:baseline;justify-content:space-between;gap:18px;flex-wrap:wrap}
+h1{margin:0;font-size:20px;font-weight:650}.meta{font-size:15px;color:#dbe2f5}.meta .hl{color:#4a7cff;font-weight:650}nav{display:flex;gap:8px;align-items:center}nav a{padding:6px 10px;border:1px solid #2a2f3a;border-radius:4px;background:#1c2030;color:#9db7ff;text-decoration:none;font-size:13px}nav a.active{background:#2d4a8a;border-color:#4a7cff;color:#fff}
+.controls{padding:12px 20px;border-bottom:1px solid #2a2f3a;background:#13161e;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.controls label{font-size:12px;color:#a8b0c2;display:flex;align-items:center;gap:5px}input,select,button{background:#1c2030;color:#e4e6eb;border:1px solid #2a2f3a;padding:6px 10px;border-radius:4px;font-size:13px}input:focus,select:focus{outline:none;border-color:#4a7cff}button{cursor:pointer}button:hover{background:#252b3d}input[type=checkbox]{width:auto;margin:0}
+.market-tabs{display:flex;gap:6px}.market-tabs button{min-width:96px}.market-tabs button.active{background:#2d4a8a;border-color:#4a7cff;color:#fff}
+.table-wrap{overflow:auto;max-height:calc(100vh - 176px)}table{width:100%;border-collapse:collapse;font-size:13px}thead th{position:sticky;top:0;background:#1c2030;padding:8px 10px;text-align:left;border-bottom:1px solid #2a2f3a;cursor:pointer;white-space:nowrap}thead th.sorted-asc::after{content:" ▲";color:#4a7cff}thead th.sorted-desc::after{content:" ▼";color:#4a7cff}tbody td{padding:6px 10px;border-bottom:1px solid #1f2330;white-space:nowrap}tbody tr:hover{background:#181c28}.pos{color:#3fcf8e}.neg{color:#ff5f6d}.num{text-align:right;font-variant-numeric:tabular-nums}.missing{color:#6b7185}.footer{padding:8px 20px;font-size:11px;color:#6b7185;border-top:1px solid #2a2f3a}
+@media(max-width:768px){header{padding:10px 12px}h1{font-size:16px}.meta{font-size:13px}.controls{padding:8px 12px;gap:8px}.controls input,.controls select,.controls button{font-size:12px;padding:5px 8px}.table-wrap{max-height:calc(100vh - 200px)}table{font-size:11px}}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Target Price</h1>
+  <nav><a href="index.html">Ranking</a><a href="hsp.html">HSP</a><a class="active" href="tp.html">TP</a></nav>
+  <div class="meta" id="meta">載入中...</div>
+</header>
+<div class="controls">
+  <div class="market-tabs" id="marketTabs"></div>
+  <input id="search" type="text" placeholder="搜尋 RIC / 公司名 / 類股" style="width:220px;">
+  <label><input id="hasTpOnly" type="checkbox" checked>只看有 TP</label>
+  <label>排序：<select id="sortCol"></select></label>
+  <select id="sortDir"><option value="desc">由大到小</option><option value="asc">由小到大</option></select>
+  <button id="exportBtn">匯出 CSV</button>
+  <span style="color:#8b93a7;font-size:12px;" id="count"></span>
+</div>
+<div class="table-wrap"><table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table></div>
+<div class="footer">資料來源：LSEG；TP 欄位：Price Target - Mean；Upside = Target Price / 收盤價 - 1。價格日為收盤價日期，TP更新日為本地資料擷取日期，財報期間為 LSEG FQ 查詢對應期間。</div>
+<script>
+let ALL_DATA=[], DATA=[], MARKETS=[], MARKET_META={};
+const COLS=[
+ {key:'ric',label:'RIC',type:'str',fmt:v=>v,defaultSort:'asc'},
+ {key:'market',label:'市場',type:'str',fmt:v=>v||'-'},
+ {key:'name_zh',label:'公司',type:'str',fmt:v=>v||'-'},
+ {key:'company_name',label:'英文名',type:'str',fmt:v=>v||'-'},
+ {key:'sector',label:'類股',type:'str',fmt:v=>v||'-'},
+ {key:'close',label:'收盤價',type:'num',fmt:v=>money(v)},
+ {key:'target_price',label:'Target Price',type:'num',fmt:v=>money(v)},
+ {key:'upside',label:'Upside',type:'pct',fmt:v=>fmtPct(v)},
+ {key:'price_date',label:'價格日',type:'str',fmt:v=>v||'-'},
+ {key:'target_as_of',label:'TP更新日',type:'str',fmt:v=>v||'-'},
+ {key:'target_period_end',label:'財報期間',type:'str',fmt:v=>v||'-'},
+ {key:'currency',label:'幣別',type:'str',fmt:v=>v||'-'}
+];
+let state={market:'US',sortKey:'upside',sortDir:'desc',search:'',hasTpOnly:true};
+function money(v){return v==null||isNaN(v)?'-':Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
+function fmtPct(v){return v==null||isNaN(v)?'-':(v*100).toFixed(2)+'%'}
+const sortColEl=document.getElementById('sortCol');
+COLS.forEach(c=>{const o=document.createElement('option');o.value=c.key;o.textContent=c.label;sortColEl.appendChild(o)});sortColEl.value=state.sortKey;
+document.getElementById('search').addEventListener('input',e=>{state.search=e.target.value.toLowerCase();render()});
+document.getElementById('hasTpOnly').addEventListener('change',e=>{state.hasTpOnly=e.target.checked;render()});
+sortColEl.addEventListener('change',e=>{state.sortKey=e.target.value;render()});
+document.getElementById('sortDir').addEventListener('change',e=>{state.sortDir=e.target.value;render()});
+document.getElementById('exportBtn').onclick=exportCSV;
+function setMarket(m){state.market=m;DATA=ALL_DATA.filter(r=>r.market===m);document.querySelectorAll('#marketTabs button').forEach(b=>b.classList.toggle('active',b.dataset.market===m));render()}
+function getRows(){let rows=DATA.slice();if(state.hasTpOnly)rows=rows.filter(r=>r.target_price!=null);if(state.search)rows=rows.filter(r=>(r.ric||'').toLowerCase().includes(state.search)||(r.company_name||'').toLowerCase().includes(state.search)||(r.name_zh||'').toLowerCase().includes(state.search)||(r.sector||'').toLowerCase().includes(state.search));return rows}
+function sortRows(rows){const k=state.sortKey,dir=state.sortDir==='asc'?1:-1;return rows.slice().sort((a,b)=>{let va=a[k],vb=b[k];if(va==null&&vb==null)return 0;if(va==null)return 1;if(vb==null)return-1;if(typeof va==='number')return(va-vb)*dir;return(''+va).localeCompare(''+vb)*dir})}
+function render(){const meta=MARKET_META[state.market]||{};document.getElementById('title').textContent=(meta.indexName||state.market)+' Target Price';document.getElementById('meta').innerHTML=`共 <span class="hl">${DATA.length}</span> 檔 ｜ TP <span class="hl">${meta.tpCount||0}</span> 檔 ｜ 缺 TP <span class="hl">${meta.missingTp||0}</span> 檔 ｜ 幣別：<span class="hl">${meta.currency||'-'}</span> ｜ 價格日期：<span class="hl">${meta.dataDate||'-'}</span>`;const thead=document.getElementById('thead');thead.innerHTML='';COLS.forEach(c=>{const th=document.createElement('th');th.textContent=c.label;if(c.type!=='str')th.className='num';if(c.key===state.sortKey)th.classList.add(state.sortDir==='asc'?'sorted-asc':'sorted-desc');th.onclick=()=>{if(state.sortKey===c.key)state.sortDir=state.sortDir==='asc'?'desc':'asc';else{state.sortKey=c.key;state.sortDir=c.type==='str'?'asc':'desc'}sortColEl.value=state.sortKey;document.getElementById('sortDir').value=state.sortDir;render()};thead.appendChild(th)});const rows=sortRows(getRows());document.getElementById('count').textContent=`顯示 ${rows.length} / ${DATA.length}`;renderRows(rows)}
+function tdFor(c,r){const td=document.createElement('td');td.textContent=c.fmt(r[c.key]);if(c.type!=='str')td.classList.add('num');if(r[c.key]==null)td.classList.add('missing');if(c.key==='upside'){const v=r[c.key];if(v>0)td.classList.add('pos');if(v<0)td.classList.add('neg')}return td}
+function renderRows(rows){const tb=document.getElementById('tbody');tb.innerHTML='';if(!rows.length){const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=COLS.length;td.className='missing';td.textContent='沒有符合條件的資料';tr.appendChild(td);tb.appendChild(tr);return}rows.forEach(r=>{const tr=document.createElement('tr');COLS.forEach(c=>tr.appendChild(tdFor(c,r)));tb.appendChild(tr)})}
+function exportCSV(){const rows=sortRows(getRows());const csv=[COLS.map(c=>c.label).join(',')].concat(rows.map(r=>COLS.map(c=>`"${String(c.fmt(r[c.key])).replaceAll('"','""')}"`).join(','))).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));a.download=`tp_${state.market}.csv`;a.click()}
+async function loadTpData(){try{const res=await fetch('data/tp.json',{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);const payload=await res.json();ALL_DATA=payload.records||[];MARKETS=payload.markets||[];MARKET_META=Object.fromEntries(MARKETS.map(m=>[m.market,m]));const tabs=document.getElementById('marketTabs');tabs.innerHTML='';MARKETS.forEach(m=>{const b=document.createElement('button');b.textContent=m.indexName;b.dataset.market=m.market;b.onclick=()=>setMarket(m.market);tabs.appendChild(b)});setMarket(MARKETS[0]?.market||'US')}catch(err){document.getElementById('meta').innerHTML='<span class="hl">資料載入失敗</span>';document.getElementById('count').textContent='Cannot load data/tp.json. Use a static web server instead of opening file:// directly.';console.error(err)}}
+loadTpData();
+</script>
+</body>
+</html>
