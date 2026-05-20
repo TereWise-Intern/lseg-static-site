@@ -6,6 +6,7 @@ Included files:
 - `index.html`
 - `hsp.html`
 - `tp.html`
+- `ranking_iv_vol20_top10.png`
 - `data/ranking.json`
 - `data/hsp_prices.json`
 - `data/tp.json`
