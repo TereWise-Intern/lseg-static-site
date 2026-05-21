@@ -16,8 +16,6 @@ main{padding:18px 20px 28px}
 .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
 .stamp{color:#a8b0c2;font-size:13px} .stamp strong{color:#fff;font-weight:650}
 .manual-update{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.manual-update input{min-height:34px;padding:7px 9px;border:1px solid #2a2f3a;border-radius:4px;background:#11151d;color:#e6e8ef;font-size:12px}
-.manual-update input.api-url{width:260px}.manual-update input.token{width:180px}
 .update-status{color:#a8b0c2;font-size:12px}
 .update-status.ok{color:#3fcf8e}.update-status.warn{color:#ffd166}.update-status.err{color:#ff5f6d}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(260px,1fr));gap:14px}
@@ -59,8 +57,6 @@ button.button{cursor:pointer;font-family:inherit}
   <div class="topbar">
     <div class="stamp">Market overview data date: <strong>2026-05-20</strong></div>
     <div class="manual-update">
-      <input id="updateApiUrl" class="api-url" placeholder="Update API URL">
-      <input id="updateToken" class="token" type="password" placeholder="Update token">
       <button id="manualUpdateBtn" class="button" type="button">Update Now</button>
       <span id="manualUpdateStatus" class="update-status">Checking local update service...</span>
     </div>
@@ -124,53 +120,16 @@ button.button{cursor:pointer;font-family:inherit}
 <script>
 const updateBtn = document.getElementById('manualUpdateBtn');
 const updateStatus = document.getElementById('manualUpdateStatus');
-const apiUrlInput = document.getElementById('updateApiUrl');
-const tokenInput = document.getElementById('updateToken');
-const DEFAULT_REMOTE_UPDATE_API = "https://estimated-honey-landscape-pal.trycloudflare.com";
-
-function defaultApiUrl() {
-  if (location.protocol === 'http:' && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
-    return location.origin;
-  }
-  return localStorage.getItem('lsegUpdateApiUrl') || DEFAULT_REMOTE_UPDATE_API || '';
-}
-
-apiUrlInput.value = defaultApiUrl();
-tokenInput.value = localStorage.getItem('lsegUpdateToken') || '';
+const UPDATE_API = 'http://127.0.0.1:8765';
 
 function setUpdateStatus(text, cls) {
   updateStatus.textContent = text;
   updateStatus.className = 'update-status' + (cls ? ' ' + cls : '');
 }
 
-function updateApi() {
-  return apiUrlInput.value.trim().replace(/\/$/, '');
-}
-
-function updateHeaders() {
-  return {'X-Update-Token': tokenInput.value.trim()};
-}
-
-function saveUpdateSettings() {
-  localStorage.setItem('lsegUpdateApiUrl', updateApi());
-  localStorage.setItem('lsegUpdateToken', tokenInput.value.trim());
-}
-
 async function fetchUpdateStatus() {
-  const api = updateApi();
-  if (!api) {
-    updateBtn.disabled = true;
-    setUpdateStatus('Enter update API URL and token.', 'warn');
-    return;
-  }
-  saveUpdateSettings();
   try {
-    const res = await fetch(api + '/api/update-status', {cache:'no-store', headers:updateHeaders()});
-    if (res.status === 401) {
-      updateBtn.disabled = true;
-      setUpdateStatus('Invalid or missing update token.', 'err');
-      return;
-    }
+    const res = await fetch(UPDATE_API + '/api/update-status', {cache:'no-store'});
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     updateBtn.disabled = !!data.running;
@@ -186,26 +145,15 @@ async function fetchUpdateStatus() {
     }
   } catch (err) {
     updateBtn.disabled = true;
-    setUpdateStatus('Cannot reach update service. Start run_downloads_server.bat or check tunnel URL.', 'warn');
+    setUpdateStatus('Start run_downloads_server.bat to enable local update.', 'warn');
   }
 }
 
 async function startManualUpdate() {
-  const api = updateApi();
-  if (!api || !tokenInput.value.trim()) {
-    setUpdateStatus('Enter update API URL and token first.', 'warn');
-    return;
-  }
-  saveUpdateSettings();
   updateBtn.disabled = true;
   setUpdateStatus('Starting update...', 'warn');
   try {
-    const res = await fetch(api + '/api/update-market-overview', {method:'POST', headers:updateHeaders()});
-    if (res.status === 401) {
-      setUpdateStatus('Invalid or missing update token.', 'err');
-      updateBtn.disabled = true;
-      return;
-    }
+    const res = await fetch(UPDATE_API + '/api/update-market-overview', {method:'POST'});
     if (!res.ok && res.status !== 409) throw new Error('HTTP ' + res.status);
     setUpdateStatus('Update started. This can take a few minutes.', 'warn');
     setTimeout(fetchUpdateStatus, 3000);
@@ -216,8 +164,6 @@ async function startManualUpdate() {
 }
 
 updateBtn.addEventListener('click', startManualUpdate);
-apiUrlInput.addEventListener('change', fetchUpdateStatus);
-tokenInput.addEventListener('change', fetchUpdateStatus);
 fetchUpdateStatus();
 </script>
 </body>
