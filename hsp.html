@@ -343,11 +343,11 @@
     margin-top: 0 !important;
   }
 
-  #comboRows td:nth-child(6),
-  #comboRows th:nth-child(6),
+  #comboRows td:nth-child(8),
+  #comboRows th:nth-child(8),
   #comboRows + tr,
-  .combo-table th:nth-child(6),
-  .combo-table td:nth-child(6) {
+  .combo-table th:nth-child(8),
+  .combo-table td:nth-child(8) {
     display: none;
   }
 
@@ -559,7 +559,7 @@
     <div class="grid">
       <div class="panel">
         <h2>Estimated Parameters</h2>
-        <div class="body"><table><thead><tr><th>Market</th><th>RIC</th><th>Name</th><th class="num">S0</th><th class="num">KO Price</th><th class="num">KI Price</th><th class="num">Ann. Vol</th></tr></thead><tbody id="paramRows"></tbody></table></div>
+        <div class="body"><table><thead><tr><th>Market</th><th>RIC</th><th>Name</th><th class="num">S0</th><th class="num">Strike Price</th><th class="num">KO Price</th><th class="num">KI Price</th><th class="num">Ann. Vol</th></tr></thead><tbody id="paramRows"></tbody></table></div>
       </div>
       <div class="panel">
         <h2>Correlation Matrix</h2>
@@ -580,12 +580,14 @@
               <th class="sortable" data-combo-sort="rics">Underlyings<span class="sort-mark"></span></th>
               <th class="num sortable" data-combo-sort="hsp">HSP<span class="sort-mark"></span></th>
               <th class="num sortable" data-combo-sort="strike">Solved Strike<span class="sort-mark"></span></th>
+              <th class="sortable" data-combo-sort="strikePrice">Strike Prices<span class="sort-mark"></span></th>
+              <th class="sortable" data-combo-sort="koPrice">KO Prices<span class="sort-mark"></span></th>
               <th class="num sortable" data-combo-sort="ko">KO Prob.<span class="sort-mark"></span></th>
               <th class="num sortable" data-combo-sort="se">Std. Error<span class="sort-mark"></span></th>
             </tr>
           </thead>
           <tbody id="comboRows">
-            <tr><td colspan="6" class="muted">Select a basket, choose combo size, then run combo analysis.</td></tr>
+            <tr><td colspan="8" class="muted">Select a basket, choose combo size, then run combo analysis.</td></tr>
           </tbody>
         </table>
       </div>
@@ -600,6 +602,8 @@ const DEFAULT_RICS = ["NVDA.OQ", "AAPL.OQ", "MSFT.OQ"];
 var SELECTED_RICS = new Set(DEFAULT_RICS);
 var COMBO_ROWS = [];
 var COMBO_SORT = { key: "idx", dir: "asc" };
+var LAST_STRIKE_PRICES = "-";
+var LAST_KO_PRICES = "-";
 
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, function(c) {
@@ -766,12 +770,19 @@ function estimate(rics, lookbackDays) {
   });
   return { vols: vols, corrMat: corrMat, spots: spots, sampleDays: aligned.length };
 }
-function renderParams(rics, est, koLevel, kiLevel) {
+function renderParams(rics, est, strikeLevel, koLevel, kiLevel) {
+  LAST_STRIKE_PRICES = rics.map(function(ric, i) {
+    return ric + " " + money(est.spots[i] * strikeLevel);
+  }).join("; ");
+  LAST_KO_PRICES = rics.map(function(ric, i) {
+    return ric + " " + money(est.spots[i] * koLevel);
+  }).join("; ");
   document.getElementById("paramRows").innerHTML = rics.map(function(ric, i) {
     var meta = HSP_DATA.meta[ric] || {};
     var name = meta.name || meta.nameEn || "-";
     return "<tr><td>" + esc(meta.market || "-") + "</td><td>" + esc(ric) + "</td><td>" + esc(name) + "</td><td class=\"num\">" +
-      num(est.spots[i]) + "</td><td class=\"num\">" + money(est.spots[i] * koLevel) +
+      num(est.spots[i]) + "</td><td class=\"num\">" + money(est.spots[i] * strikeLevel) +
+      "</td><td class=\"num\">" + money(est.spots[i] * koLevel) +
       "</td><td class=\"num\">" + money(est.spots[i] * kiLevel) +
       "</td><td class=\"num\">" + pct(est.vols[i]) + "</td></tr>";
   }).join("");
@@ -804,7 +815,7 @@ function simulate() {
   var targetHsp = Number(document.getElementById("targetHsp").value) / 100;
 
   var est = estimate(rics, lookbackDays);
-  renderParams(rics, est, ko0, ki);
+  renderParams(rics, est, strike, ko0, ki);
   var l = cholesky(est.corrMat);
   var rand = rng(20260505);
   var n = rics.length;
@@ -1043,6 +1054,8 @@ function pctTextValue(text) {
 function comboSortValue(row, key) {
   if (key === "idx") return Number(row.originalIdx || row.idx || 0);
   if (key === "rics") return String(row.rics || "").toLowerCase();
+  if (key === "strikePrice") return String(row.strikePrice || "").toLowerCase();
+  if (key === "koPrice") return String(row.koPrice || "").toLowerCase();
   return pctTextValue(row[key]);
 }
 
@@ -1095,6 +1108,8 @@ function renderSortedComboRows() {
     return "<tr><td>" + esc(displayIdx) + "</td><td>" + esc(row.rics) + "</td>" +
       '<td class="num">' + esc(row.hsp) + "</td>" +
       '<td class="num">' + esc(row.strike) + "</td>" +
+      '<td>' + esc(row.strikePrice || "-") + "</td>" +
+      '<td>' + esc(row.koPrice || "-") + "</td>" +
       '<td class="num">' + esc(row.ko) + "</td>" +
       '<td class="num">' + esc(row.se) + "</td></tr>";
   }).join("");
@@ -1107,12 +1122,12 @@ async function runManualComboAnalysis() {
   var body = document.getElementById("comboRows");
   var status = document.getElementById("manualComboStatus");
   if (!parsed.combos.length && !parsed.errors.length) {
-    body.innerHTML = '<tr><td colspan="6" class="muted">Paste one combo per line, then run manual combos.</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" class="muted">Paste one combo per line, then run manual combos.</td></tr>';
     if (status) status.textContent = "No manual combos entered.";
     return;
   }
 
-  body.innerHTML = '<tr><td colspan="6" class="muted">Running ' + parsed.combos.length + ' manual combo(s)...</td></tr>';
+  body.innerHTML = '<tr><td colspan="8" class="muted">Running ' + parsed.combos.length + ' manual combo(s)...</td></tr>';
   resetCalcProgress("Manual combo");
   await nextPaint();
   var original = selectedRics();
@@ -1123,7 +1138,7 @@ async function runManualComboAnalysis() {
     setCalcProgress(i, parsed.combos.length, "Manual combo");
     await nextPaint();
     if (combo.rics.length > 6) {
-      rows.push({ rics: combo.rics.join(", "), hsp: "ERR", strike: "-", ko: "-", se: "Maximum 6 underlyings per combo." });
+      rows.push({ rics: combo.rics.join(", "), hsp: "ERR", strike: "-", strikePrice: "-", koPrice: "-", ko: "-", se: "Maximum 6 underlyings per combo." });
       setCalcProgress(i + 1, parsed.combos.length, "Manual combo");
       continue;
     }
@@ -1134,6 +1149,8 @@ async function runManualComboAnalysis() {
         rics: combo.rics.join(", "),
         hsp: document.getElementById("hsp").textContent,
         strike: document.getElementById("solvedStrike").textContent,
+        strikePrice: LAST_STRIKE_PRICES,
+        koPrice: LAST_KO_PRICES,
         ko: document.getElementById("koProb").textContent,
         se: document.getElementById("stderr").textContent
       });
@@ -1142,6 +1159,8 @@ async function runManualComboAnalysis() {
         rics: combo.rics.join(", "),
         hsp: "ERR",
         strike: "-",
+        strikePrice: "-",
+        koPrice: "-",
         ko: "-",
         se: err.message || String(err)
       });
@@ -1151,7 +1170,7 @@ async function runManualComboAnalysis() {
 
   setSelectedRics(original);
   parsed.errors.forEach(function(err) {
-    rows.push({ rics: err.input, hsp: "ERR", strike: "-", ko: "-", se: err.message });
+    rows.push({ rics: err.input, hsp: "ERR", strike: "-", strikePrice: "-", koPrice: "-", ko: "-", se: err.message });
   });
   rows.forEach(function(row, idx) { row.idx = idx + 1; });
   renderComboRows(rows);
@@ -1171,12 +1190,12 @@ async function runComboAnalysis() {
   var maxCombos = Math.max(1, Math.floor(Number(document.getElementById("comboMax").value) || 50));
   var body = document.getElementById("comboRows");
   if (original.length < size) {
-    body.innerHTML = '<tr><td colspan="6" class="muted">Select at least ' + size + ' underlyings.</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" class="muted">Select at least ' + size + ' underlyings.</td></tr>';
     return;
   }
   var combos = buildCombos(original, size, maxCombos);
   var totalPossible = comboCount(original.length, size);
-  body.innerHTML = '<tr><td colspan="6" class="muted">Running ' + combos.length +
+  body.innerHTML = '<tr><td colspan="8" class="muted">Running ' + combos.length +
     ' combo(s) out of ' + totalPossible + ' possible...</td></tr>';
   resetCalcProgress("Combo");
   await nextPaint();
@@ -1193,6 +1212,8 @@ async function runComboAnalysis() {
         rics: combos[i].join(", "),
         hsp: document.getElementById("hsp").textContent,
         strike: document.getElementById("solvedStrike").textContent,
+        strikePrice: LAST_STRIKE_PRICES,
+        koPrice: LAST_KO_PRICES,
         ko: document.getElementById("koProb").textContent,
         se: document.getElementById("stderr").textContent
       });
@@ -1202,6 +1223,8 @@ async function runComboAnalysis() {
         rics: combos[i].join(", "),
         hsp: "ERR",
         strike: "-",
+        strikePrice: "-",
+        koPrice: "-",
         ko: "-",
         se: err.message || String(err)
       });
@@ -1477,7 +1500,7 @@ loadHspData();
         underlyings: cells[1],
         hsp: cells[2],
         strike: cells[3],
-        ko: cells[4],
+        ko: cells[6],
         hspValue: parsePctText(cells[2]),
         strikeValue: parsePctText(cells[3])
       };
