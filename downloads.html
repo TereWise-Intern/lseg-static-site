@@ -57,7 +57,8 @@ button.button{cursor:pointer;font-family:inherit}
   <div class="topbar">
     <div class="stamp">Market overview data date: <strong>2026-05-25</strong></div>
     <div class="manual-update">
-      <button id="manualUpdateBtn" class="button" type="button">Update Now</button>
+      <button id="marketUpdateBtn" class="button" type="button">Update Market Overview</button>
+      <button id="fullUpdateBtn" class="button secondary" type="button">Full Daily Update</button>
       <span id="manualUpdateStatus" class="update-status">Checking local update service...</span>
     </div>
   </div>
@@ -95,7 +96,7 @@ button.button{cursor:pointer;font-family:inherit}
         <div class="card-body">
           <div class="eyebrow">IV Ranking</div>
           <h2>IV / Volatility Top 10</h2>
-          <div class="meta"><span>排名圖</span><span>390 KB</span><span class="ready">Ready</span></div>
+          <div class="meta"><span>排名圖</span><span>381 KB</span><span class="ready">Ready</span></div>
           <div class="actions">
             <a class="button" href="ranking_iv_vol20_top10.png" download>Download</a>
             <a class="button secondary" href="ranking_iv_vol20_top10.png" target="_blank" rel="noopener">Open</a>
@@ -135,7 +136,10 @@ button.button{cursor:pointer;font-family:inherit}
   </section>
 </main>
 <script>
-const updateBtn = document.getElementById('manualUpdateBtn');
+const updateButtons = [
+  document.getElementById('marketUpdateBtn'),
+  document.getElementById('fullUpdateBtn')
+];
 const updateStatus = document.getElementById('manualUpdateStatus');
 const UPDATE_API = 'http://127.0.0.1:8765';
 
@@ -144,14 +148,19 @@ function setUpdateStatus(text, cls) {
   updateStatus.className = 'update-status' + (cls ? ' ' + cls : '');
 }
 
+function setButtonsDisabled(disabled) {
+  updateButtons.forEach(btn => { btn.disabled = disabled; });
+}
+
 async function fetchUpdateStatus() {
   try {
     const res = await fetch(UPDATE_API + '/api/update-status', {cache:'no-store'});
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    updateBtn.disabled = !!data.running;
+    setButtonsDisabled(!!data.running);
     if (data.running) {
-      setUpdateStatus('Update running. Started ' + (data.last_started_at || ''), 'warn');
+      const label = data.job_type === 'full' ? 'Full daily update' : 'Market overview update';
+      setUpdateStatus(label + ' running. Started ' + (data.last_started_at || ''), 'warn');
       setTimeout(fetchUpdateStatus, 3000);
     } else if (data.last_exit_code === 0) {
       setUpdateStatus('Last update completed. Refresh page to see rebuilt images.', 'ok');
@@ -161,26 +170,29 @@ async function fetchUpdateStatus() {
       setUpdateStatus('Local update service ready.', 'ok');
     }
   } catch (err) {
-    updateBtn.disabled = true;
+    setButtonsDisabled(true);
     setUpdateStatus('Start run_downloads_server.bat to enable local update.', 'warn');
   }
 }
 
-async function startManualUpdate() {
-  updateBtn.disabled = true;
-  setUpdateStatus('Starting update...', 'warn');
+async function startManualUpdate(kind) {
+  setButtonsDisabled(true);
+  const isFull = kind === 'full';
+  setUpdateStatus(isFull ? 'Starting full daily update...' : 'Starting market overview update...', 'warn');
   try {
-    const res = await fetch(UPDATE_API + '/api/update-market-overview', {method:'POST'});
+    const path = isFull ? '/api/update-full' : '/api/update-market-overview';
+    const res = await fetch(UPDATE_API + path, {method:'POST'});
     if (!res.ok && res.status !== 409) throw new Error('HTTP ' + res.status);
-    setUpdateStatus('Update started. This can take a few minutes.', 'warn');
+    setUpdateStatus(isFull ? 'Full daily update started. This can take a while.' : 'Market overview update started. This can take a few minutes.', 'warn');
     setTimeout(fetchUpdateStatus, 3000);
   } catch (err) {
-    updateBtn.disabled = true;
+    setButtonsDisabled(true);
     setUpdateStatus('Cannot reach local update service.', 'err');
   }
 }
 
-updateBtn.addEventListener('click', startManualUpdate);
+document.getElementById('marketUpdateBtn').addEventListener('click', () => startManualUpdate('market'));
+document.getElementById('fullUpdateBtn').addEventListener('click', () => startManualUpdate('full'));
 fetchUpdateStatus();
 </script>
 </body>
