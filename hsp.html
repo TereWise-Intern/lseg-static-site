@@ -343,16 +343,74 @@
     margin-top: 0 !important;
   }
 
-  #comboRows td:nth-child(8),
-  #comboRows th:nth-child(8),
+  #comboRows td:nth-child(9),
+  #comboRows th:nth-child(9),
   #comboRows + tr,
-  .combo-table th:nth-child(8),
-  .combo-table td:nth-child(8) {
+  .combo-table th:nth-child(9),
+  .combo-table td:nth-child(9) {
     display: none;
   }
 
   .combo-table {
-    min-width: 760px;
+    table-layout: fixed;
+    min-width: 1120px;
+  }
+
+  .combo-table th:nth-child(1),
+  .combo-table td:nth-child(1) {
+    width: 52px;
+  }
+
+  .combo-table th:nth-child(2),
+  .combo-table td:nth-child(2) {
+    width: 240px;
+  }
+
+  .combo-table th:nth-child(3),
+  .combo-table td:nth-child(3),
+  .combo-table th:nth-child(4),
+  .combo-table td:nth-child(4),
+  .combo-table th:nth-child(6),
+  .combo-table td:nth-child(6),
+  .combo-table th:nth-child(7),
+  .combo-table td:nth-child(7) {
+    width: 120px;
+  }
+
+  .combo-table th:nth-child(5),
+  .combo-table td:nth-child(5) {
+    width: 260px;
+  }
+
+  .combo-table th:nth-child(6),
+  .combo-table td:nth-child(6),
+  .combo-table th:nth-child(7),
+  .combo-table td:nth-child(7) {
+    width: 220px;
+  }
+
+  .combo-table td:nth-child(2),
+  .combo-table td:nth-child(5),
+  .combo-table td:nth-child(6),
+  .combo-table td:nth-child(7) {
+    white-space: normal;
+    line-height: 1.45;
+  }
+
+  .combo-table th:nth-child(6),
+  .combo-table td:nth-child(6),
+  .combo-table th:nth-child(7),
+  .combo-table td:nth-child(7) {
+    border-left: 1px solid #242936;
+  }
+
+  .combo-table th:nth-child(3),
+  .combo-table td:nth-child(3),
+  .combo-table th:nth-child(4),
+  .combo-table td:nth-child(4),
+  .combo-table th:nth-child(8),
+  .combo-table td:nth-child(8) {
+    text-align: right;
   }
 
   .combo-table td.unreachable {
@@ -582,12 +640,13 @@
               <th class="num sortable" data-combo-sort="strike">Solved Strike<span class="sort-mark"></span></th>
               <th class="sortable" data-combo-sort="strikePrice">Strike Prices<span class="sort-mark"></span></th>
               <th class="sortable" data-combo-sort="koPrice">KO Prices<span class="sort-mark"></span></th>
+              <th class="sortable" data-combo-sort="kiPrice">KI Prices<span class="sort-mark"></span></th>
               <th class="num sortable" data-combo-sort="ko">KO Prob.<span class="sort-mark"></span></th>
               <th class="num sortable" data-combo-sort="se">Std. Error<span class="sort-mark"></span></th>
             </tr>
           </thead>
           <tbody id="comboRows">
-            <tr><td colspan="8" class="muted">Select a basket, choose combo size, then run combo analysis.</td></tr>
+            <tr><td colspan="9" class="muted">Select a basket, choose combo size, then run combo analysis.</td></tr>
           </tbody>
         </table>
       </div>
@@ -604,6 +663,7 @@ var COMBO_ROWS = [];
 var COMBO_SORT = { key: "idx", dir: "asc" };
 var LAST_STRIKE_PRICES = "-";
 var LAST_KO_PRICES = "-";
+var LAST_KI_PRICES = "-";
 
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, function(c) {
@@ -613,6 +673,15 @@ function esc(s) {
 function pct(x){ return Number.isFinite(x) ? (x * 100).toFixed(2) + "%" : "-"; }
 function num(x, d){ return Number.isFinite(x) ? x.toFixed(d == null ? 2 : d) : "-"; }
 function money(x){ return Number.isFinite(x) ? x.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : "-"; }
+function priceList(rics, est, level) {
+  var values = rics.map(function(ric, i) {
+    return money(est.spots[i] * level);
+  });
+  if (values.length === 1) return values[0];
+  return rics.map(function(ric, i) {
+    return ric + ": " + values[i];
+  }).join(" / ");
+}
 function mean(xs){ return xs.reduce(function(a,b){ return a+b; }, 0) / xs.length; }
 function std(xs) {
   var m = mean(xs);
@@ -771,12 +840,9 @@ function estimate(rics, lookbackDays) {
   return { vols: vols, corrMat: corrMat, spots: spots, sampleDays: aligned.length };
 }
 function renderParams(rics, est, strikeLevel, koLevel, kiLevel) {
-  LAST_STRIKE_PRICES = rics.map(function(ric, i) {
-    return ric + " " + money(est.spots[i] * strikeLevel);
-  }).join("; ");
-  LAST_KO_PRICES = rics.map(function(ric, i) {
-    return ric + " " + money(est.spots[i] * koLevel);
-  }).join("; ");
+  LAST_STRIKE_PRICES = priceList(rics, est, strikeLevel);
+  LAST_KO_PRICES = priceList(rics, est, koLevel);
+  LAST_KI_PRICES = priceList(rics, est, kiLevel);
   document.getElementById("paramRows").innerHTML = rics.map(function(ric, i) {
     var meta = HSP_DATA.meta[ric] || {};
     var name = meta.name || meta.nameEn || "-";
@@ -1056,6 +1122,7 @@ function comboSortValue(row, key) {
   if (key === "rics") return String(row.rics || "").toLowerCase();
   if (key === "strikePrice") return String(row.strikePrice || "").toLowerCase();
   if (key === "koPrice") return String(row.koPrice || "").toLowerCase();
+  if (key === "kiPrice") return String(row.kiPrice || "").toLowerCase();
   return pctTextValue(row[key]);
 }
 
@@ -1110,6 +1177,7 @@ function renderSortedComboRows() {
       '<td class="num">' + esc(row.strike) + "</td>" +
       '<td>' + esc(row.strikePrice || "-") + "</td>" +
       '<td>' + esc(row.koPrice || "-") + "</td>" +
+      '<td>' + esc(row.kiPrice || "-") + "</td>" +
       '<td class="num">' + esc(row.ko) + "</td>" +
       '<td class="num">' + esc(row.se) + "</td></tr>";
   }).join("");
@@ -1122,12 +1190,12 @@ async function runManualComboAnalysis() {
   var body = document.getElementById("comboRows");
   var status = document.getElementById("manualComboStatus");
   if (!parsed.combos.length && !parsed.errors.length) {
-    body.innerHTML = '<tr><td colspan="8" class="muted">Paste one combo per line, then run manual combos.</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" class="muted">Paste one combo per line, then run manual combos.</td></tr>';
     if (status) status.textContent = "No manual combos entered.";
     return;
   }
 
-  body.innerHTML = '<tr><td colspan="8" class="muted">Running ' + parsed.combos.length + ' manual combo(s)...</td></tr>';
+  body.innerHTML = '<tr><td colspan="9" class="muted">Running ' + parsed.combos.length + ' manual combo(s)...</td></tr>';
   resetCalcProgress("Manual combo");
   await nextPaint();
   var original = selectedRics();
@@ -1138,7 +1206,7 @@ async function runManualComboAnalysis() {
     setCalcProgress(i, parsed.combos.length, "Manual combo");
     await nextPaint();
     if (combo.rics.length > 6) {
-      rows.push({ rics: combo.rics.join(", "), hsp: "ERR", strike: "-", strikePrice: "-", koPrice: "-", ko: "-", se: "Maximum 6 underlyings per combo." });
+      rows.push({ rics: combo.rics.join(", "), hsp: "ERR", strike: "-", strikePrice: "-", koPrice: "-", kiPrice: "-", ko: "-", se: "Maximum 6 underlyings per combo." });
       setCalcProgress(i + 1, parsed.combos.length, "Manual combo");
       continue;
     }
@@ -1151,6 +1219,7 @@ async function runManualComboAnalysis() {
         strike: document.getElementById("solvedStrike").textContent,
         strikePrice: LAST_STRIKE_PRICES,
         koPrice: LAST_KO_PRICES,
+        kiPrice: LAST_KI_PRICES,
         ko: document.getElementById("koProb").textContent,
         se: document.getElementById("stderr").textContent
       });
@@ -1161,6 +1230,7 @@ async function runManualComboAnalysis() {
         strike: "-",
         strikePrice: "-",
         koPrice: "-",
+        kiPrice: "-",
         ko: "-",
         se: err.message || String(err)
       });
@@ -1170,7 +1240,7 @@ async function runManualComboAnalysis() {
 
   setSelectedRics(original);
   parsed.errors.forEach(function(err) {
-    rows.push({ rics: err.input, hsp: "ERR", strike: "-", strikePrice: "-", koPrice: "-", ko: "-", se: err.message });
+    rows.push({ rics: err.input, hsp: "ERR", strike: "-", strikePrice: "-", koPrice: "-", kiPrice: "-", ko: "-", se: err.message });
   });
   rows.forEach(function(row, idx) { row.idx = idx + 1; });
   renderComboRows(rows);
@@ -1190,12 +1260,12 @@ async function runComboAnalysis() {
   var maxCombos = Math.max(1, Math.floor(Number(document.getElementById("comboMax").value) || 50));
   var body = document.getElementById("comboRows");
   if (original.length < size) {
-    body.innerHTML = '<tr><td colspan="8" class="muted">Select at least ' + size + ' underlyings.</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" class="muted">Select at least ' + size + ' underlyings.</td></tr>';
     return;
   }
   var combos = buildCombos(original, size, maxCombos);
   var totalPossible = comboCount(original.length, size);
-  body.innerHTML = '<tr><td colspan="8" class="muted">Running ' + combos.length +
+  body.innerHTML = '<tr><td colspan="9" class="muted">Running ' + combos.length +
     ' combo(s) out of ' + totalPossible + ' possible...</td></tr>';
   resetCalcProgress("Combo");
   await nextPaint();
@@ -1214,6 +1284,7 @@ async function runComboAnalysis() {
         strike: document.getElementById("solvedStrike").textContent,
         strikePrice: LAST_STRIKE_PRICES,
         koPrice: LAST_KO_PRICES,
+        kiPrice: LAST_KI_PRICES,
         ko: document.getElementById("koProb").textContent,
         se: document.getElementById("stderr").textContent
       });
@@ -1225,6 +1296,7 @@ async function runComboAnalysis() {
         strike: "-",
         strikePrice: "-",
         koPrice: "-",
+        kiPrice: "-",
         ko: "-",
         se: err.message || String(err)
       });
@@ -1500,7 +1572,7 @@ loadHspData();
         underlyings: cells[1],
         hsp: cells[2],
         strike: cells[3],
-        ko: cells[6],
+        ko: cells[7],
         hspValue: parsePctText(cells[2]),
         strikeValue: parsePctText(cells[3])
       };
