@@ -63,12 +63,13 @@ button.button{cursor:pointer;font-family:inherit}
     </div>
   </div>
 
-  <section class="status-panel ready">
+  <section id="overviewStatusPanel" class="status-panel ready">
     <div>
-      <div class="status-title">Market overview status: Ready</div>
-      <div class="status-detail">Expected data date: <strong>2026-05-27</strong>. Current coverage: <strong>complete</strong>.</div>
+      <div id="overviewStatusTitle" class="status-title">Market overview status: Ready</div>
+      <div id="overviewStatusDetail" class="status-detail">Expected data date: <strong>2026-05-27</strong>. Current coverage: <strong>complete</strong>.</div>
     </div>
-<div class="status-detail">All market overview instruments are current.</div>
+    <div id="overviewStatusMessage" class="status-detail">All market overview instruments are current.</div>
+    <div id="overviewStatusDynamic"><div class="status-detail">All market overview instruments are current.</div></div>
   </section>
   <section class="grid">
 
@@ -94,7 +95,7 @@ button.button{cursor:pointer;font-family:inherit}
         <div class="card-body">
           <div class="eyebrow">Market Overview</div>
           <h2>Market Overview</h2>
-          <div class="meta"><span>簡體整張</span><span>396 KB</span><span class="ready">Ready</span></div>
+          <div class="meta"><span>簡體整張</span><span>396 KB</span><span class="ready" data-overview-badge="1">Ready</span></div>
           <div class="actions">
             <a class="button" href="market_overview.png" download>Download</a>
             <a class="button secondary" href="market_overview.png" target="_blank" rel="noopener">Open</a>
@@ -109,7 +110,7 @@ button.button{cursor:pointer;font-family:inherit}
         <div class="card-body">
           <div class="eyebrow">繁體版</div>
           <h2>市場總覽</h2>
-          <div class="meta"><span>繁體整張</span><span>398 KB</span><span class="ready">Ready</span></div>
+          <div class="meta"><span>繁體整張</span><span>398 KB</span><span class="ready" data-overview-badge="1">Ready</span></div>
           <div class="actions">
             <a class="button" href="market_overview_tw.png" download>Download</a>
             <a class="button secondary" href="market_overview_tw.png" target="_blank" rel="noopener">Open</a>
@@ -125,6 +126,93 @@ const updateButtons = [
 ];
 const updateStatus = document.getElementById('manualUpdateStatus');
 const UPDATE_API = 'http://127.0.0.1:8765';
+const MARKET_NAMES = {"DJI": "道琼工业", "SPX": "标普五百", "IXIC": "纳斯达克", "SOX": "费城半导体", "N225": "日经225", "CSI300": "沪深指数", "HSI": "香港恒生", "TWII": "台湾加权", "STOXX": "欧洲600", "GDAXI": "德国", "FTSE": "英国", "US2-YR": "2年期", "US10-YR": "10年期", "US20-YR": "20年期", "XAU": "黄金", "HGc1": "纽约铜", "BRENT": "布伦特原油", "WTI": "西德州原油", "BTCUSD": "比特币", "DXY": "美元指数", "SOFR": "隔夜拆款", "EURUSD": "欧元/美金", "GBPUSD": "英镑/美金", "USDCNH": "美金/人民币", "USDCHF": "美金/瑞郎", "USDJPY": "美金/日圆", "AUDUSD": "澳币/美金", "USDTWD": "美金/台币"};
+
+function yyyyMmDd(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function expectedMarketDate() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  while (d.getDay() === 0 || d.getDay() === 6) {
+    d.setDate(d.getDate() - 1);
+  }
+  return yyyyMmDd(d);
+}
+
+function updateOverviewBadges(state) {
+  document.querySelectorAll('[data-overview-badge]').forEach(el => {
+    el.className = state;
+    el.textContent = state === 'ready' ? 'Ready' : state === 'missing' ? 'Missing' : state === 'partial' ? 'Partial' : 'Stale';
+  });
+}
+
+function renderDynamicOverviewStatus(payload) {
+  const expected = expectedMarketDate();
+  const records = Array.isArray(payload.records) ? payload.records : [];
+  const rows = records.map(row => {
+    const ric = row.display_ric || row.ric || '-';
+    const latest = row.date || null;
+    const status = latest ? (latest >= expected ? 'ready' : 'stale') : 'missing';
+    return {
+      name: row.name_zh || MARKET_NAMES[ric] || '-',
+      ric,
+      date: latest || '-',
+      status
+    };
+  });
+  const missing = rows.filter(row => row.status === 'missing').length;
+  const stale = rows.filter(row => row.status === 'stale').length;
+  const state = missing ? 'missing' : stale ? 'partial' : 'ready';
+  const label = missing ? `${missing} missing` : stale ? `${stale} stale` : 'complete';
+
+  const panel = document.getElementById('overviewStatusPanel');
+  const title = document.getElementById('overviewStatusTitle');
+  const detail = document.getElementById('overviewStatusDetail');
+  const message = document.getElementById('overviewStatusMessage');
+  const dynamic = document.getElementById('overviewStatusDynamic');
+  const stamp = document.querySelector('.stamp strong');
+  if (!panel || !title || !detail || !message || !dynamic) return;
+
+  panel.className = 'status-panel ' + state;
+  title.textContent = 'Market overview status: ' + (state === 'ready' ? 'Ready' : state === 'missing' ? 'Missing' : 'Partial');
+  detail.innerHTML = `Expected data date: <strong>${expected}</strong>. Current coverage: <strong>${label}</strong>.`;
+  if (stamp) stamp.textContent = payload.dataDate || '-';
+  updateOverviewBadges(state);
+
+  const badRows = rows.filter(row => row.status !== 'ready');
+  if (!badRows.length) {
+    message.textContent = 'All market overview instruments are current.';
+    dynamic.innerHTML = '';
+    return;
+  }
+
+  message.textContent = `資料未更新成功或尚未完整。可能原因：Refinitiv/LSEG 尚未釋出 ${expected} 的資料、LSEG 登入中斷，或部分市場休市。`;
+  const body = badRows.map(row => `<tr><td>${row.name}</td><td>${row.ric}</td><td>${row.date}</td><td>${row.status === 'missing' ? 'Missing' : 'Stale'}</td></tr>`).join('');
+  dynamic.innerHTML = `
+    <details open>
+      <summary>Show stale or missing instruments</summary>
+      <table class="status-table">
+        <thead><tr><th>Name</th><th>RIC</th><th>Latest date</th><th>Status</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+    </details>`;
+}
+
+async function refreshOverviewStatus() {
+  try {
+    const res = await fetch('data/market_overview.json?ts=' + Date.now(), {cache:'no-store'});
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    renderDynamicOverviewStatus(await res.json());
+  } catch (err) {
+    const message = document.getElementById('overviewStatusMessage');
+    if (message) message.textContent = 'Cannot read market overview data file.';
+  }
+}
 
 function setUpdateStatus(text, cls) {
   updateStatus.textContent = text;
@@ -176,6 +264,7 @@ async function startManualUpdate(kind) {
 
 document.getElementById('marketUpdateBtn').addEventListener('click', () => startManualUpdate('market'));
 document.getElementById('fullUpdateBtn').addEventListener('click', () => startManualUpdate('full'));
+refreshOverviewStatus();
 fetchUpdateStatus();
 </script>
 </body>
