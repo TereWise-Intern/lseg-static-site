@@ -127,6 +127,35 @@ const updateButtons = [
 const updateStatus = document.getElementById('manualUpdateStatus');
 const UPDATE_API = 'http://127.0.0.1:8765';
 const MARKET_NAMES = {"DJI": "道琼工业", "SPX": "标普五百", "IXIC": "纳斯达克", "SOX": "费城半导体", "N225": "日经225", "CSI300": "沪深指数", "HSI": "香港恒生", "TWII": "台湾加权", "STOXX": "欧洲600", "GDAXI": "德国", "FTSE": "英国", "US2-YR": "2年期", "US10-YR": "10年期", "US20-YR": "20年期", "XAU": "黄金", "HGc1": "纽约铜", "BRENT": "布伦特原油", "WTI": "西德州原油", "BTCUSD": "比特币", "DXY": "美元指数", "SOFR": "隔夜拆款", "EURUSD": "欧元/美金", "GBPUSD": "英镑/美金", "USDCNH": "美金/人民币", "USDCHF": "美金/瑞郎", "USDJPY": "美金/日圆", "AUDUSD": "澳币/美金", "USDTWD": "美金/台币"};
+const RIC_CALENDAR = {
+  DJI:'US_STOCK', SPX:'US_STOCK', IXIC:'US_STOCK', SOX:'US_STOCK',
+  HSI:'HK_STOCK', FTSE:'UK_STOCK',
+  'US2-YR':'US_BOND', 'US10-YR':'US_BOND', 'US20-YR':'US_BOND',
+  HGc1:'CME', WTI:'CME'
+};
+const MARKET_HOLIDAYS = {
+  '2026-01-01': {
+    US_STOCK:'美國 New Year 休市', US_BOND:'美國 New Year 休市', CME:'美國 New Year 休市',
+    UK_STOCK:'英國 New Year 休市', HK_STOCK:'香港 New Year 休市'
+  },
+  '2026-01-19': {US_STOCK:'美國 Martin Luther King Jr. Day 休市', US_BOND:'美國 Martin Luther King Jr. Day 休市', CME:'美國 Martin Luther King Jr. Day 休市'},
+  '2026-02-16': {US_STOCK:'美國 Presidents Day 休市', US_BOND:'美國 Presidents Day 休市', CME:'美國 Presidents Day 休市'},
+  '2026-04-03': {US_STOCK:'美國 Good Friday 休市', US_BOND:'美國 Good Friday 休市', CME:'Good Friday 商品市場休市', UK_STOCK:'英國 Good Friday 休市', HK_STOCK:'香港 Good Friday 休市'},
+  '2026-04-06': {UK_STOCK:'英國 Easter Monday 休市', HK_STOCK:'香港 Easter Monday 休市'},
+  '2026-05-25': {
+    US_STOCK:'美國 Memorial Day 休市', US_BOND:'美國 Memorial Day 休市', CME:'美國 Memorial Day 期貨/商品市場休市',
+    UK_STOCK:'英國 Spring Bank Holiday 休市', HK_STOCK:'香港佛誕翌日補假休市'
+  },
+  '2026-07-03': {US_STOCK:'美國 Independence Day 補假休市', US_BOND:'美國 Independence Day 補假休市', CME:'美國 Independence Day 補假休市'},
+  '2026-09-07': {US_STOCK:'美國 Labor Day 休市', US_BOND:'美國 Labor Day 休市', CME:'美國 Labor Day 休市'},
+  '2026-11-26': {US_STOCK:'美國 Thanksgiving 休市', US_BOND:'美國 Thanksgiving 休市', CME:'美國 Thanksgiving 休市'},
+  '2026-12-25': {
+    US_STOCK:'美國 Christmas 休市', US_BOND:'美國 Christmas 休市', CME:'美國 Christmas 休市',
+    UK_STOCK:'英國 Christmas 休市', HK_STOCK:'香港 Christmas 休市'
+  }
+};
+let LAST_UPDATE_STATUS = null;
+let MARKET_OVERVIEW_PAYLOAD = null;
 
 function yyyyMmDd(d) {
   const y = d.getFullYear();
@@ -149,6 +178,36 @@ function updateOverviewBadges(state) {
     el.className = state;
     el.textContent = state === 'ready' ? 'Ready' : state === 'missing' ? 'Missing' : state === 'partial' ? 'Partial' : 'Stale';
   });
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[ch]));
+}
+
+function holidayReason(ric, expected) {
+  const calendar = RIC_CALENDAR[ric];
+  return calendar && MARKET_HOLIDAYS[expected] ? MARKET_HOLIDAYS[expected][calendar] || '' : '';
+}
+
+function updateErrorReason() {
+  const msg = String(LAST_UPDATE_STATUS?.last_message || '');
+  const code = LAST_UPDATE_STATUS?.last_exit_code;
+  if (!code) return '';
+  if (/Session is not opened|Can't send any request|session|login|登入/i.test(msg)) {
+    return 'LSEG 登入中斷或 session 未開啟';
+  }
+  if (/No data to return|No successful response|not support|universe does not support/i.test(msg)) {
+    return 'Refinitiv/LSEG 尚未釋出資料或該欄位暫無資料';
+  }
+  return '更新程式執行失敗，請查看本機服務訊息';
+}
+
+function reasonForRow(row, expected) {
+  const holiday = holidayReason(row.ric, expected);
+  if (holiday) return holiday;
+  return updateErrorReason() || 'Refinitiv/LSEG 尚未釋出資料，或需要稍後重試';
 }
 
 function renderDynamicOverviewStatus(payload) {
@@ -191,13 +250,15 @@ function renderDynamicOverviewStatus(payload) {
     return;
   }
 
-  message.textContent = `資料未更新成功或尚未完整。可能原因：Refinitiv/LSEG 尚未釋出 ${expected} 的資料、LSEG 登入中斷，或部分市場休市。`;
-  const body = badRows.map(row => `<tr><td>${row.name}</td><td>${row.ric}</td><td>${row.date}</td><td>${row.status === 'missing' ? 'Missing' : 'Stale'}</td></tr>`).join('');
+  const rowsWithReason = badRows.map(row => ({...row, reason: reasonForRow(row, expected)}));
+  const reasons = [...new Set(rowsWithReason.map(row => row.reason))];
+  message.textContent = `資料未更新成功或尚未完整。原因：${reasons.join('；')}。`;
+  const body = rowsWithReason.map(row => `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.ric)}</td><td>${escapeHtml(row.date)}</td><td>${row.status === 'missing' ? 'Missing' : 'Stale'}</td><td>${escapeHtml(row.reason)}</td></tr>`).join('');
   dynamic.innerHTML = `
     <details open>
       <summary>Show stale or missing instruments</summary>
       <table class="status-table">
-        <thead><tr><th>Name</th><th>RIC</th><th>Latest date</th><th>Status</th></tr></thead>
+        <thead><tr><th>Name</th><th>RIC</th><th>Latest date</th><th>Status</th><th>Reason</th></tr></thead>
         <tbody>${body}</tbody>
       </table>
     </details>`;
@@ -207,7 +268,8 @@ async function refreshOverviewStatus() {
   try {
     const res = await fetch('data/market_overview.json?ts=' + Date.now(), {cache:'no-store'});
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    renderDynamicOverviewStatus(await res.json());
+    MARKET_OVERVIEW_PAYLOAD = await res.json();
+    renderDynamicOverviewStatus(MARKET_OVERVIEW_PAYLOAD);
   } catch (err) {
     const message = document.getElementById('overviewStatusMessage');
     if (message) message.textContent = 'Cannot read market overview data file.';
@@ -228,6 +290,8 @@ async function fetchUpdateStatus() {
     const res = await fetch(UPDATE_API + '/api/update-status', {cache:'no-store'});
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
+    LAST_UPDATE_STATUS = data;
+    if (MARKET_OVERVIEW_PAYLOAD) renderDynamicOverviewStatus(MARKET_OVERVIEW_PAYLOAD);
     setButtonsDisabled(!!data.running);
     if (data.running) {
       const label = data.job_type === 'full' ? 'Full daily update' : 'Market overview update';
