@@ -295,12 +295,12 @@ async function fetchUpdateStatus() {
     setButtonsDisabled(!!data.running);
     if (data.running) {
       const label = data.job_type === 'full' ? 'Full daily update' : 'Market overview update';
-      setUpdateStatus(label + ' running. Started ' + (data.last_started_at || ''), 'warn');
+      setUpdateStatus(label + ' is running in the cmd window. Started ' + (data.last_started_at || ''), 'warn');
       setTimeout(fetchUpdateStatus, 3000);
     } else if (data.last_exit_code === 0) {
-      setUpdateStatus('Last update completed. Refresh page to see rebuilt images.', 'ok');
+      setUpdateStatus('Last update completed. Result report should be open.', 'ok');
     } else if (data.last_exit_code) {
-      setUpdateStatus('Last update failed. Check local server window.', 'err');
+      setUpdateStatus('Last update finished with a problem. Check the result report.', 'err');
     } else {
       setUpdateStatus('Local update service ready.', 'ok');
     }
@@ -318,7 +318,7 @@ async function startManualUpdate(kind) {
     const path = isFull ? '/api/update-full' : '/api/update-market-overview';
     const res = await fetch(UPDATE_API + path, {method:'POST'});
     if (!res.ok && res.status !== 409) throw new Error('HTTP ' + res.status);
-    setUpdateStatus(isFull ? 'Full daily update started. This can take a while.' : 'Market overview update started. This can take a few minutes.', 'warn');
+    setUpdateStatus(isFull ? 'Cmd window opened for full daily update. The report will open when it finishes.' : 'Cmd window opened for market overview update. The report will open when it finishes.', 'warn');
     setTimeout(fetchUpdateStatus, 3000);
   } catch (err) {
     setButtonsDisabled(true);
