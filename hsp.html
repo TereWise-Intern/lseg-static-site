@@ -34,6 +34,10 @@
   details.manual-combo summary { cursor:pointer; color:#dbe2f5; font-size:13px; font-weight:650; }
   details.manual-combo .manual-combo-inner { margin-top:10px; }
   .manual-combo-actions { display:grid; grid-template-columns:minmax(180px, 260px) 1fr; gap:10px; align-items:center; margin-top:8px; }
+  .jump-settings { margin:2px 0 10px; padding:10px; border:1px solid #2a2f3a; border-radius:6px; background:#13161e; }
+  .jump-settings.is-hidden { display:none; }
+  .jump-settings .row:last-child label { margin-bottom:0; }
+  .fixed-rule { margin:-2px 0 10px; padding:7px 9px; border-left:3px solid #4a7cff; background:#131824; color:#a8b0c2; font-size:12px; line-height:1.45; }
   .calc-progress { margin-top:10px; padding:10px; border:1px solid #2a2f3a; border-radius:6px; background:#13161e; }
   .calc-progress.is-hidden { display:none; }
   .calc-progress-track { height:8px; overflow:hidden; border-radius:999px; background:#242936; }
@@ -580,6 +584,31 @@
           <input id="drift" type="number" value="0" step="0.5">
         </label>
       </div>
+      <div class="fixed-rule">Guarantee Period: fixed at 1 month. KO observation starts only after the first month; KI remains active during the guarantee period.</div>
+      <label>Jump Mode
+        <select id="jumpMode">
+          <option value="off">Off - Standard GBM</option>
+          <option value="merton">On - Merton Jump-Diffusion</option>
+        </select>
+      </label>
+      <div id="jumpSettings" class="jump-settings is-hidden">
+        <div class="row">
+          <label>Jump frequency (/year)
+            <input id="jumpLambda" type="number" value="0.75" min="0" max="20" step="0.05">
+          </label>
+          <label>Mean jump return (%)
+            <input id="jumpMean" type="number" value="-10" min="-99" max="500" step="0.5">
+          </label>
+        </div>
+        <div class="row">
+          <label>Jump volatility (%)
+            <input id="jumpVol" type="number" value="8" min="0" max="200" step="0.5">
+          </label>
+          <label>Common jump share (%)
+            <input id="jumpCommon" type="number" value="50" min="0" max="100" step="5">
+          </label>
+        </div>
+      </div>
       <button id="runBtn" class="primary">Calculate</button>
       <div class="row" style="margin-top:10px;">
         <label>Combo size
@@ -909,6 +938,11 @@ function simulate() {
   var barrierType = document.getElementById("barrierType").value;
   var calcMode = document.getElementById("calcMode").value;
   var targetHsp = Number(document.getElementById("targetHsp").value) / 100;
+  var jumpMode = document.getElementById("jumpMode").value;
+  var jumpLambda = Number(document.getElementById("jumpLambda").value);
+  var jumpMean = Number(document.getElementById("jumpMean").value) / 100;
+  var jumpVol = Number(document.getElementById("jumpVol").value) / 100;
+  var jumpCommon = Number(document.getElementById("jumpCommon").value) / 100;
 
   var levels = [
     ["Strike", strike],
@@ -930,6 +964,20 @@ function simulate() {
   if (calcMode === "strike" && (!Number.isFinite(targetHsp) || targetHsp < 0 || targetHsp > 1)) {
     throw new Error("Target HSP must be between 0% and 100%.");
   }
+  if (jumpMode === "merton") {
+    if (!Number.isFinite(jumpLambda) || jumpLambda < 0 || jumpLambda > 20) {
+      throw new Error("Jump frequency must be between 0 and 20 per year.");
+    }
+    if (!Number.isFinite(jumpMean) || jumpMean <= -1) {
+      throw new Error("Mean jump return must be greater than -100%.");
+    }
+    if (!Number.isFinite(jumpVol) || jumpVol < 0 || jumpVol > 2) {
+      throw new Error("Jump volatility must be between 0% and 200%.");
+    }
+    if (!Number.isFinite(jumpCommon) || jumpCommon < 0 || jumpCommon > 1) {
+      throw new Error("Common jump share must be between 0% and 100%.");
+    }
+  }
 
   var est = estimate(rics, lookbackDays);
   var l = cholesky(est.corrMat);
@@ -937,13 +985,20 @@ function simulate() {
   var n = rics.length;
   var days = Math.max(1, Math.round(TRADING_DAYS * tenorM / 12));
   var obsEvery = Math.max(1, Math.round(TRADING_DAYS * obsFreqM / 12));
+  var guaranteeDays = Math.max(1, Math.round(TRADING_DAYS / 12));
   var obsDays = [];
   for (var od = obsEvery; od < days; od += obsEvery) obsDays.push(od);
   obsDays.push(days);
   var obsSet = new Set(obsDays);
   var isDaily = koType.indexOf("Daily") >= 0;
   var isMemory = koType.indexOf("Memory") >= 0;
+  var useJump = jumpMode === "merton" && jumpLambda > 0;
   var dt = 1 / TRADING_DAYS;
+  var commonIntensity = jumpLambda * jumpCommon;
+  var idioIntensity = jumpLambda * (1 - jumpCommon);
+  var commonJumpProb = 1 - Math.exp(-commonIntensity * dt);
+  var idioJumpProb = 1 - Math.exp(-idioIntensity * dt);
+  var jumpLogMean = useJump ? Math.log1p(jumpMean) - 0.5 * jumpVol * jumpVol : 0;
 
   var hsp = 0, koCount = 0, kiCount = 0;
   var eligibleWorst = [];
@@ -953,16 +1008,25 @@ function simulate() {
     var koHit = false, kiHit = barrierType === "NONE";
     for (var d = 1; d <= days; d++) {
       var z = normals(rand, n);
+      var commonJump = 1;
+      if (useJump && rand() < commonJumpProb) {
+        commonJump = Math.exp(jumpLogMean + jumpVol * normals(rand, 1)[0]);
+      }
       var w = Array(n).fill(0);
       for (var i = 0; i < n; i++) for (var j = 0; j <= i; j++) w[i] += l[i][j] * z[j];
       for (var si = 0; si < n; si++) {
         var vol = est.vols[si];
-        s[si] *= Math.exp((drift - 0.5 * vol * vol) * dt + vol * Math.sqrt(dt) * w[si]);
+        var idioJump = 1;
+        if (useJump && rand() < idioJumpProb) {
+          idioJump = Math.exp(jumpLogMean + jumpVol * normals(rand, 1)[0]);
+        }
+        s[si] *= Math.exp((drift - 0.5 * vol * vol) * dt +
+          vol * Math.sqrt(dt) * w[si]) * commonJump * idioJump;
       }
       if (barrierType === "AKI" && Math.min.apply(null, s) <= ki) kiHit = true;
-      var shouldCheckKo = isDaily || obsSet.has(d);
+      var shouldCheckKo = d > guaranteeDays && (isDaily || obsSet.has(d));
       if (shouldCheckKo) {
-        var obsNo = Math.max(0, Math.ceil(d / obsEvery) - 1);
+        var obsNo = Math.max(0, Math.floor((d - guaranteeDays - 1) / obsEvery));
         var koLevel = ko0 - stepDown * obsNo;
         if (isMemory) {
           for (var mi = 0; mi < n; mi++) if (s[mi] >= koLevel) memory[mi] = true;
@@ -1033,6 +1097,11 @@ function simulate() {
     "Data date: " + HSP_DATA.asOf + "\n" +
     "Underlying: " + marketLine + "\n" +
     modeLine +
+    "Model: " + (useJump
+      ? "Merton Jump-Diffusion (frequency " + num(jumpLambda, 2) + "/year, mean " +
+        pct(jumpMean) + ", jump vol " + pct(jumpVol) + ", common share " + pct(jumpCommon) + ")"
+      : "Standard GBM") + "\n" +
+    "Guarantee period: 1 month (" + guaranteeDays + " trading days); KO disabled during guarantee period; KI remains active.\n" +
     "Estimation window: " + lookbackLabel(lookbackDays) + "; common sample: " + est.sampleDays + " trading days" + sampleNote + "\n" +
     "Simulation tenor: " + days + " trading days; paths: " + paths.toLocaleString() + "\n" +
     "Event counts: HSP " + hsp.toLocaleString() + ", KO " + koCount.toLocaleString() +
@@ -1409,11 +1478,21 @@ function comboCount(n, k) {
   return Math.round(nume / den);
 }
 
+function syncJumpSettings() {
+  var settings = document.getElementById("jumpSettings");
+  var enabled = document.getElementById("jumpMode").value === "merton";
+  settings.classList.toggle("is-hidden", !enabled);
+  Array.from(settings.querySelectorAll("input")).forEach(function(input) {
+    input.disabled = !enabled;
+  });
+}
+
 function attachEvents() {
   document.getElementById("ricSearch").addEventListener("input", function(e){ populateRicSelect(e.target.value); });
   document.getElementById("marketFilter").addEventListener("change", function(){
     populateRicSelect(document.getElementById("ricSearch").value);
   });
+  document.getElementById("jumpMode").addEventListener("change", syncJumpSettings);
   document.getElementById("rics").addEventListener("mousedown", function(e) {
     if (e.target.tagName !== "OPTION") return;
     e.preventDefault();
@@ -1455,6 +1534,7 @@ function attachEvents() {
     });
   });
   updateComboSortMarks();
+  syncJumpSettings();
 }
 
 async function loadHspData() {
