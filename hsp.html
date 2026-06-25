@@ -53,6 +53,15 @@
   th.sortable:hover { color:#fff; background:#252b3d; }
   th.sortable .sort-mark { margin-left:4px; color:#4a7cff; font-size:11px; }
   td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .combo-table { min-width:1180px; }
+  .combo-table tbody td { vertical-align:top; padding-top:12px; padding-bottom:12px; }
+  .combo-table .price-cell { min-width:190px; white-space:normal; }
+  .price-stack { display:grid; gap:3px; min-width:170px; }
+  .price-item { display:flex; align-items:baseline; justify-content:space-between; gap:14px; padding:4px 7px; border-radius:4px; background:#131824; }
+  .price-item:nth-child(even) { background:#171d2a; }
+  .price-ric { color:#8faeff; font-family:Consolas, "SFMono-Regular", monospace; font-size:12px; font-weight:650; letter-spacing:.1px; }
+  .price-value { color:#f2f5fb; font-size:13px; font-weight:650; font-variant-numeric:tabular-nums; text-align:right; }
+  .price-empty { display:block; color:#697286; text-align:center; }
   .log { margin-top:14px; min-height:70px; white-space:pre-wrap; color:#a8b0c2; }
   .help { margin-top:14px; padding:12px 14px; background:#13161e; border-top:1px solid #2a2f3a; color:#8b93a7; font-size:12px; line-height:1.55; }
   @media (max-width: 980px) {
@@ -631,7 +640,7 @@
     <div class="panel" style="margin-top:14px;">
       <h2>Combo Analysis</h2>
       <div class="body" style="overflow:auto;">
-        <table>
+        <table class="combo-table">
           <thead>
             <tr>
               <th class="sortable" data-combo-sort="idx">#<span class="sort-mark"></span></th>
@@ -674,14 +683,20 @@ function pct(x){ return Number.isFinite(x) ? (x * 100).toFixed(2) + "%" : "-"; }
 function num(x, d){ return Number.isFinite(x) ? x.toFixed(d == null ? 2 : d) : "-"; }
 function money(x){ return Number.isFinite(x) ? x.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : "-"; }
 function priceList(rics, est, level) {
-  if (!Number.isFinite(level)) return "-";
-  var values = rics.map(function(ric, i) {
-    return money(est.spots[i] * level);
-  });
-  if (values.length === 1) return values[0];
+  if (!Number.isFinite(level)) return [];
   return rics.map(function(ric, i) {
-    return ric + ": " + values[i];
-  }).join(" / ");
+    var raw = est.spots[i] * level;
+    return { ric: ric, value: money(raw), raw: raw };
+  });
+}
+function renderPriceCell(items) {
+  if (!Array.isArray(items) || !items.length) {
+    return '<span class="price-empty">-</span>';
+  }
+  return '<div class="price-stack">' + items.map(function(item) {
+    return '<div class="price-item"><span class="price-ric">' + esc(item.ric) +
+      '</span><span class="price-value">' + esc(item.value) + '</span></div>';
+  }).join("") + "</div>";
 }
 function mean(xs){ return xs.reduce(function(a,b){ return a+b; }, 0) / xs.length; }
 function std(xs) {
@@ -1187,9 +1202,10 @@ function pctTextValue(text) {
 function comboSortValue(row, key) {
   if (key === "idx") return Number(row.originalIdx || row.idx || 0);
   if (key === "rics") return String(row.rics || "").toLowerCase();
-  if (key === "strikePrice") return String(row.strikePrice || "").toLowerCase();
-  if (key === "koPrice") return String(row.koPrice || "").toLowerCase();
-  if (key === "kiPrice") return String(row.kiPrice || "").toLowerCase();
+  if (["strikePrice", "koPrice", "kiPrice"].indexOf(key) >= 0) {
+    var prices = row[key];
+    return Array.isArray(prices) && prices.length ? Number(prices[0].raw) : NaN;
+  }
   return pctTextValue(row[key]);
 }
 
@@ -1242,9 +1258,9 @@ function renderSortedComboRows() {
     return "<tr><td>" + esc(displayIdx) + "</td><td>" + esc(row.rics) + "</td>" +
       '<td class="num">' + esc(row.hsp) + "</td>" +
       '<td class="num">' + esc(row.strike) + "</td>" +
-      '<td>' + esc(row.strikePrice || "-") + "</td>" +
-      '<td>' + esc(row.koPrice || "-") + "</td>" +
-      '<td>' + esc(row.kiPrice || "-") + "</td>" +
+      '<td class="price-cell">' + renderPriceCell(row.strikePrice) + "</td>" +
+      '<td class="price-cell">' + renderPriceCell(row.koPrice) + "</td>" +
+      '<td class="price-cell">' + renderPriceCell(row.kiPrice) + "</td>" +
       '<td class="num">' + esc(row.ko) + "</td>" +
       '<td class="num">' + esc(row.se) + "</td></tr>";
   }).join("");
