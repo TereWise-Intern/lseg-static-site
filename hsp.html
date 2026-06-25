@@ -34,9 +34,9 @@
   details.manual-combo summary { cursor:pointer; color:#dbe2f5; font-size:13px; font-weight:650; }
   details.manual-combo .manual-combo-inner { margin-top:10px; }
   .manual-combo-actions { display:grid; grid-template-columns:minmax(180px, 260px) 1fr; gap:10px; align-items:center; margin-top:8px; }
-  .jump-settings { margin:2px 0 10px; padding:10px; border:1px solid #2a2f3a; border-radius:6px; background:#13161e; }
-  .jump-settings.is-hidden { display:none; }
-  .jump-settings .row:last-child label { margin-bottom:0; }
+  .jump-preset { margin:-2px 0 10px; padding:8px 10px; border:1px solid #2a2f3a; border-radius:6px; background:#13161e; color:#a8b0c2; font-size:12px; line-height:1.5; }
+  .jump-preset.is-hidden { display:none; }
+  .jump-preset strong { color:#dbe2f5; font-weight:650; }
   .fixed-rule { margin:-2px 0 10px; padding:7px 9px; border-left:3px solid #4a7cff; background:#131824; color:#a8b0c2; font-size:12px; line-height:1.45; }
   .calc-progress { margin-top:10px; padding:10px; border:1px solid #2a2f3a; border-radius:6px; background:#13161e; }
   .calc-progress.is-hidden { display:none; }
@@ -588,26 +588,11 @@
       <label>Jump Mode
         <select id="jumpMode">
           <option value="off">Off - Standard GBM</option>
-          <option value="merton">On - Merton Jump-Diffusion</option>
+          <option value="merton">On - Fixed Jump Stress</option>
         </select>
       </label>
-      <div id="jumpSettings" class="jump-settings is-hidden">
-        <div class="row">
-          <label>Jump frequency (/year)
-            <input id="jumpLambda" type="number" value="0.75" min="0" max="20" step="0.05">
-          </label>
-          <label>Mean jump return (%)
-            <input id="jumpMean" type="number" value="-10" min="-99" max="500" step="0.5">
-          </label>
-        </div>
-        <div class="row">
-          <label>Jump volatility (%)
-            <input id="jumpVol" type="number" value="8" min="0" max="200" step="0.5">
-          </label>
-          <label>Common jump share (%)
-            <input id="jumpCommon" type="number" value="50" min="0" max="100" step="5">
-          </label>
-        </div>
+      <div id="jumpPreset" class="jump-preset is-hidden">
+        <strong>Fixed moderate stress:</strong> frequency 0.50/year · mean jump -10% · jump volatility 8% · common jump share 50%.
       </div>
       <button id="runBtn" class="primary">Calculate</button>
       <div class="row" style="margin-top:10px;">
@@ -696,6 +681,12 @@
 let HSP_DATA = null;
 const TRADING_DAYS = 252;
 const DEFAULT_RICS = ["NVDA.OQ", "AAPL.OQ", "MSFT.OQ"];
+const JUMP_STRESS = Object.freeze({
+  lambda: 0.50,
+  mean: -0.10,
+  volatility: 0.08,
+  commonShare: 0.50
+});
 var SELECTED_RICS = new Set(DEFAULT_RICS);
 var COMBO_ROWS = [];
 var COMBO_SORT = { key: "idx", dir: "asc" };
@@ -939,10 +930,10 @@ function simulate() {
   var calcMode = document.getElementById("calcMode").value;
   var targetHsp = Number(document.getElementById("targetHsp").value) / 100;
   var jumpMode = document.getElementById("jumpMode").value;
-  var jumpLambda = Number(document.getElementById("jumpLambda").value);
-  var jumpMean = Number(document.getElementById("jumpMean").value) / 100;
-  var jumpVol = Number(document.getElementById("jumpVol").value) / 100;
-  var jumpCommon = Number(document.getElementById("jumpCommon").value) / 100;
+  var jumpLambda = JUMP_STRESS.lambda;
+  var jumpMean = JUMP_STRESS.mean;
+  var jumpVol = JUMP_STRESS.volatility;
+  var jumpCommon = JUMP_STRESS.commonShare;
 
   var levels = [
     ["Strike", strike],
@@ -964,21 +955,6 @@ function simulate() {
   if (calcMode === "strike" && (!Number.isFinite(targetHsp) || targetHsp < 0 || targetHsp > 1)) {
     throw new Error("Target HSP must be between 0% and 100%.");
   }
-  if (jumpMode === "merton") {
-    if (!Number.isFinite(jumpLambda) || jumpLambda < 0 || jumpLambda > 20) {
-      throw new Error("Jump frequency must be between 0 and 20 per year.");
-    }
-    if (!Number.isFinite(jumpMean) || jumpMean <= -1) {
-      throw new Error("Mean jump return must be greater than -100%.");
-    }
-    if (!Number.isFinite(jumpVol) || jumpVol < 0 || jumpVol > 2) {
-      throw new Error("Jump volatility must be between 0% and 200%.");
-    }
-    if (!Number.isFinite(jumpCommon) || jumpCommon < 0 || jumpCommon > 1) {
-      throw new Error("Common jump share must be between 0% and 100%.");
-    }
-  }
-
   var est = estimate(rics, lookbackDays);
   var l = cholesky(est.corrMat);
   var rand = rng(20260505);
@@ -1479,12 +1455,9 @@ function comboCount(n, k) {
 }
 
 function syncJumpSettings() {
-  var settings = document.getElementById("jumpSettings");
+  var settings = document.getElementById("jumpPreset");
   var enabled = document.getElementById("jumpMode").value === "merton";
   settings.classList.toggle("is-hidden", !enabled);
-  Array.from(settings.querySelectorAll("input")).forEach(function(input) {
-    input.disabled = !enabled;
-  });
 }
 
 function attachEvents() {
