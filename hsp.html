@@ -593,10 +593,10 @@
       <details id="manualComboBox" class="manual-combo">
         <summary>Manual combo input</summary>
         <div class="manual-combo-inner">
-          <textarea id="manualComboText" spellcheck="false" placeholder="1 EWT+TSM+NVDA+AAPL&#10;2 EWT+TSM+NVDA+MSFT"></textarea>
+          <textarea id="manualComboText" spellcheck="false" placeholder="6971.T + 3382.T + 8308.T&#10;1.6971 T + 3382 T + 8308 T"></textarea>
           <div class="manual-combo-actions">
             <button id="manualComboBtn" type="button">Run Manual Combos</button>
-            <span id="manualComboStatus" class="muted">One combo per line. Ticker symbols such as AAPL, TSM, QQQ are resolved to available RICs.</span>
+            <span id="manualComboStatus" class="muted">One combo per line. Supports optional row numbers, dot/space exchange suffixes, and separators such as +, comma, slash, or tab.</span>
           </div>
         </div>
       </details>
@@ -674,6 +674,7 @@ function pct(x){ return Number.isFinite(x) ? (x * 100).toFixed(2) + "%" : "-"; }
 function num(x, d){ return Number.isFinite(x) ? x.toFixed(d == null ? 2 : d) : "-"; }
 function money(x){ return Number.isFinite(x) ? x.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : "-"; }
 function priceList(rics, est, level) {
+  if (!Number.isFinite(level)) return "-";
   var values = rics.map(function(ric, i) {
     return money(est.spots[i] * level);
   });
@@ -861,6 +862,20 @@ function renderParams(rics, est, strikeLevel, koLevel, kiLevel) {
   document.getElementById("corrTbl").innerHTML = "<thead>" + head + "</thead><tbody>" + body + "</tbody>";
 }
 
+function showCalcError(err) {
+  ["hsp", "solvedStrike", "koProb", "stderr", "ci"].forEach(function(id) {
+    document.getElementById(id).textContent = "-";
+  });
+  document.getElementById("hsp").className = "value";
+  document.getElementById("paramRows").innerHTML =
+    '<tr><td colspan="8" class="muted">Fix the calculation inputs and try again.</td></tr>';
+  document.getElementById("corrTbl").innerHTML = "";
+  LAST_STRIKE_PRICES = "-";
+  LAST_KO_PRICES = "-";
+  LAST_KI_PRICES = "-";
+  document.getElementById("log").textContent = "Calculation error: " + (err.message || String(err));
+}
+
 function simulate() {
   var rics = selectedRics();
   if (!rics.length) throw new Error("Select at least one underlying.");
@@ -880,8 +895,28 @@ function simulate() {
   var calcMode = document.getElementById("calcMode").value;
   var targetHsp = Number(document.getElementById("targetHsp").value) / 100;
 
+  var levels = [
+    ["Strike", strike],
+    ["KO initial level", ko0],
+    ["KI level", ki],
+    ["Step-down", stepDown]
+  ];
+  levels.forEach(function(item) {
+    if (!Number.isFinite(item[1]) || item[1] < 0) {
+      throw new Error(item[0] + " must be a non-negative number.");
+    }
+  });
+  if (!Number.isFinite(tenorM) || tenorM <= 0) throw new Error("Tenor must be greater than 0 months.");
+  if (!Number.isFinite(obsFreqM) || obsFreqM <= 0) throw new Error("KO observation frequency must be greater than 0 months.");
+  if (!Number.isFinite(paths) || paths < 1000 || paths > 200000) {
+    throw new Error("Simulation paths must be between 1,000 and 200,000.");
+  }
+  if (!Number.isFinite(drift)) throw new Error("Annual drift must be a number.");
+  if (calcMode === "strike" && (!Number.isFinite(targetHsp) || targetHsp < 0 || targetHsp > 1)) {
+    throw new Error("Target HSP must be between 0% and 100%.");
+  }
+
   var est = estimate(rics, lookbackDays);
-  renderParams(rics, est, strike, ko0, ki);
   var l = cholesky(est.corrMat);
   var rand = rng(20260505);
   var n = rics.length;
@@ -953,6 +988,11 @@ function simulate() {
       document.getElementById("strike").value = (solvedStrike * 100).toFixed(2);
     }
   }
+
+  var displayedStrike = calcMode === "strike"
+    ? (impossibleTarget ? NaN : solvedStrike)
+    : strike;
+  renderParams(rics, est, displayedStrike, ko0, ki);
 
   var hspProb = hsp / paths;
   var koProb = koCount / paths;
@@ -1053,6 +1093,8 @@ function buildRicAliasIndex() {
 function resolveManualToken(token, aliases) {
   var cleaned = String(token || "").trim().toUpperCase();
   cleaned = cleaned.replace(/^[\s"'`]+|[\s"'`,;]+$/g, "");
+  cleaned = cleaned.replace(/\s*\.\s*/g, ".");
+  cleaned = cleaned.replace(/^([A-Z0-9^=_-]+)\s+(OQ|O|N|P|T|HK|US)$/i, "$1.$2");
   if (!cleaned) return null;
   if (cleaned.endsWith(".US")) cleaned = cleaned.slice(0, -3);
   if (HSP_DATA.series[cleaned]) return cleaned;
@@ -1075,11 +1117,37 @@ function resolveManualToken(token, aliases) {
   throw new Error("Unknown ticker/RIC " + cleaned);
 }
 
+function stripManualLineLabel(line) {
+  var raw = String(line || "").trim();
+  if (!raw) return "";
+
+  // Explicit labels: "1.", "1)", "1、", "1:" and "1-" (spaces optional).
+  var explicit = raw.match(/^\d{1,3}\s*[\.)、:：-]\s*(.+)$/);
+  if (explicit) return explicit[1].trim();
+
+  // Space-only labels such as "1 6971 T + ...". A four-digit Japanese
+  // ticker followed by its exchange suffix, e.g. "6971 T + ...", is not a label.
+  var spaced = raw.match(/^(\d{1,3})\s+(.+)$/);
+  if (spaced) {
+    var remainder = spaced[2].trim();
+    var suffixOnly = /^(OQ|O|N|P|T|HK|US)\b\s*(?:[+＋,，、;；/|&＆]|$)/i.test(remainder);
+    if (!suffixOnly) return remainder;
+  }
+  return raw;
+}
+
+function normalizeManualRicSpacing(text) {
+  return String(text || "")
+    .replace(/([A-Z0-9^=_-]+)\s*\.\s*(OQ|O|N|P|T|HK|US)\b/gi, "$1.$2")
+    .replace(/([A-Z0-9^=_-]+)\s+(OQ|O|N|P|T|HK|US)\b/gi, "$1.$2");
+}
+
 function splitManualComboLine(body) {
-  var text = String(body || "").trim();
+  var text = normalizeManualRicSpacing(body).trim();
   if (!text) return [];
-  var parts = text.split(/[+\t,]+/).map(function(x){ return x.trim(); }).filter(Boolean);
-  if (parts.length <= 1 && text.indexOf("+") < 0 && text.indexOf(",") < 0) {
+  var hasSeparator = /[+＋\t,，、;；/|&＆]/.test(text);
+  var parts = text.split(/[+＋\t,，、;；/|&＆]+/).map(function(x){ return x.trim(); }).filter(Boolean);
+  if (parts.length <= 1 && !hasSeparator) {
     parts = text.split(/\s+/).map(function(x){ return x.trim(); }).filter(Boolean);
   }
   return parts;
@@ -1092,8 +1160,7 @@ function parseManualCombos(text) {
   String(text || "").split(/\r?\n/).forEach(function(line, idx) {
     var raw = line.trim();
     if (!raw) return;
-    var labelMatch = raw.match(/^(\d+)[\.)]?\s+(.*)$/);
-    var body = labelMatch ? labelMatch[2] : raw;
+    var body = stripManualLineLabel(raw);
     var parts = splitManualComboLine(body);
     if (!parts.length) return;
     try {
@@ -1348,7 +1415,7 @@ function attachEvents() {
   document.getElementById("rics").addEventListener("change", function(){ renderSelectedUnderlyings(); populateRicSelect(document.getElementById("ricSearch").value); });
   document.getElementById("runBtn").addEventListener("click", function() {
     try { simulate(); }
-    catch (err) { document.getElementById("log").textContent = err.message || String(err); }
+    catch (err) { showCalcError(err); }
   });
   document.getElementById("comboBtn").addEventListener("click", function() {
     try { runComboAnalysis().catch(function(err) { document.getElementById("log").textContent = err.message || String(err); }); }
