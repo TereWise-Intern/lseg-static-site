@@ -1512,7 +1512,8 @@ function attachEvents() {
 
 async function loadHspData() {
   try {
-    const res = await fetch("data/hsp_prices.json", { cache: "no-store" });
+    const dataUrl = "data/hsp_prices_20260708_d641e38cff77.json";
+    const res = await fetch(dataUrl, { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     HSP_DATA = await res.json();
     var marketFilter = document.getElementById("marketFilter");
@@ -1529,7 +1530,7 @@ async function loadHspData() {
     simulate();
   } catch (err) {
     document.getElementById("log").textContent =
-      "Cannot load data/hsp_prices.json. Use a static web server instead of opening file:// directly.\n" +
+      "Cannot load data/hsp_prices_20260708_d641e38cff77.json. Use a static web server instead of opening file:// directly.\n" +
       (err.message || String(err));
   }
 }
