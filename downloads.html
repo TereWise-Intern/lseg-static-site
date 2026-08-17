@@ -63,39 +63,13 @@ button.button{cursor:pointer;font-family:inherit}
     </div>
   </div>
 
-  <section id="overviewStatusPanel" class="status-panel partial">
+  <section id="overviewStatusPanel" class="status-panel ready">
     <div>
-      <div id="overviewStatusTitle" class="status-title">Market overview status: Partial</div>
-      <div id="overviewStatusDetail" class="status-detail">Expected data date: <strong>2026-08-14</strong>. Current coverage: <strong>20 stale</strong>.</div>
+      <div id="overviewStatusTitle" class="status-title">Market overview status: Ready</div>
+      <div id="overviewStatusDetail" class="status-detail">Expected data date: <strong>2026-08-14</strong>. Current coverage: <strong>complete</strong>.</div>
     </div>
-    <div id="overviewStatusMessage" class="status-detail">Some market overview instruments are stale or missing.</div>
-    <div id="overviewStatusDynamic">
-      <details id="overviewDetails">
-        <summary>Show stale or missing instruments</summary>
-        <table class="status-table">
-          <thead><tr><th>Name</th><th>RIC</th><th>Latest date</th><th>Status</th></tr></thead>
-          <tbody id="overviewStatusRows"><tr><td>道琼工业</td><td>DJI</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>标普五百</td><td>SPX</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>纳斯达克</td><td>IXIC</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>费城半导体</td><td>SOX</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>2年期</td><td>US2-YR</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>10年期</td><td>US10-YR</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>20年期</td><td>US20-YR</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>黄金</td><td>XAU</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>纽约铜</td><td>HGc1</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>布伦特原油</td><td>BRENT</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>西德州原油</td><td>WTI</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>比特币</td><td>BTCUSD</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>美元指数</td><td>DXY</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>欧元/美金</td><td>EURUSD</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>英镑/美金</td><td>GBPUSD</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>美金/人民币</td><td>USDCNH</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>美金/瑞郎</td><td>USDCHF</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>美金/日圆</td><td>USDJPY</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>澳币/美金</td><td>AUDUSD</td><td>2026-08-13</td><td>Stale</td></tr>
-<tr><td>美金/台币</td><td>USDTWD</td><td>2026-08-13</td><td>Stale</td></tr></tbody>
-        </table>
-      </details></div>
+    <div id="overviewStatusMessage" class="status-detail">All market overview instruments are current.</div>
+    <div id="overviewStatusDynamic"><div class="status-detail">All market overview instruments are current.</div></div>
   </section>
   <section class="grid">
 
@@ -106,7 +80,7 @@ button.button{cursor:pointer;font-family:inherit}
         <div class="card-body">
           <div class="eyebrow">IV Ranking</div>
           <h2>IV / Volatility Top 10</h2>
-          <div class="meta"><span>排名圖</span><span>88 KB</span><span class="ready">Ready</span></div>
+          <div class="meta"><span>排名圖</span><span>393 KB</span><span class="ready">Ready</span></div>
           <div class="actions">
             <a class="button" href="ranking_iv_vol20_top10.png" download>Download</a>
             <a class="button secondary" href="ranking_iv_vol20_top10.png" target="_blank" rel="noopener">Open</a>
@@ -121,7 +95,7 @@ button.button{cursor:pointer;font-family:inherit}
         <div class="card-body">
           <div class="eyebrow">Market Overview</div>
           <h2>Market Overview</h2>
-          <div class="meta"><span>簡體整張</span><span>393 KB</span><span class="partial" data-overview-badge="1">Partial</span></div>
+          <div class="meta"><span>簡體整張</span><span>385 KB</span><span class="ready" data-overview-badge="1">Ready</span></div>
           <div class="actions">
             <a class="button" href="market_overview.png" download>Download</a>
             <a class="button secondary" href="market_overview.png" target="_blank" rel="noopener">Open</a>
@@ -136,7 +110,7 @@ button.button{cursor:pointer;font-family:inherit}
         <div class="card-body">
           <div class="eyebrow">繁體版</div>
           <h2>市場總覽</h2>
-          <div class="meta"><span>繁體整張</span><span>395 KB</span><span class="partial" data-overview-badge="1">Partial</span></div>
+          <div class="meta"><span>繁體整張</span><span>387 KB</span><span class="ready" data-overview-badge="1">Ready</span></div>
           <div class="actions">
             <a class="button" href="market_overview_tw.png" download>Download</a>
             <a class="button secondary" href="market_overview_tw.png" target="_blank" rel="noopener">Open</a>
