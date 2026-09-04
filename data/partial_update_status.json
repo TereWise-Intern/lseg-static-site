@@ -1,0 +1,23 @@
+{
+  "status": "PARTIAL",
+  "published_at": "2026-09-04T10:04:00+08:00",
+  "market_data_date": "2026-09-03",
+  "complete_sections": [
+    "US/JP/HK daily prices",
+    "market overview",
+    "US/JP/HK market-cap snapshots",
+    "US implied-volatility snapshots"
+  ],
+  "partial_sections": [
+    "US analyst price targets"
+  ],
+  "unchanged_from_last_complete_release": [
+    "rankings",
+    "target-price pages",
+    "S&P 500 backtest package",
+    "US Top 1000 analysis-ready database",
+    "total-return supplements"
+  ],
+  "last_complete_data_date": "2026-09-02",
+  "reason": "LSEG daily request quota exhausted during analyst price-target refresh"
+}
