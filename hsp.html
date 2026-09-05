@@ -485,7 +485,6 @@
 
 </head>
 <body>
-<div role="status" style="padding:10px 20px;background:#5b4714;border-bottom:1px solid #b9912f;color:#fff3c4;font-size:13px;line-height:1.5"><strong>部分發布｜2026-09-04</strong>：市場總覽已更新至 2026-09-03；排名、目標價及回測資料仍使用上一個完整版本（資料日至 2026-09-02）。完整更新成功後將自動取代本提示。</div>
 <header>
   <h1>HSP Calculator</h1>
   <nav>
@@ -1513,7 +1512,7 @@ function attachEvents() {
 
 async function loadHspData() {
   try {
-    const dataUrl = "data/hsp_prices_20260902_efe29dfdb616.json";
+    const dataUrl = "data/hsp_prices_20260904_c8fbfce597da.json";
     const res = await fetch(dataUrl, { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     HSP_DATA = await res.json();
@@ -1531,7 +1530,7 @@ async function loadHspData() {
     simulate();
   } catch (err) {
     document.getElementById("log").textContent =
-      "Cannot load data/hsp_prices_20260902_efe29dfdb616.json. Use a static web server instead of opening file:// directly.\n" +
+      "Cannot load data/hsp_prices_20260904_c8fbfce597da.json. Use a static web server instead of opening file:// directly.\n" +
       (err.message || String(err));
   }
 }
