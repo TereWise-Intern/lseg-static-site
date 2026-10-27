@@ -624,7 +624,7 @@
         </div>
       </details>
       <div class="help">
-        HSP is the simulated probability of no KO, terminal worst-of below Strike, and KI triggered. Historical adj_close data is loaded from this project's multi-market data lake.
+        HSP is the simulated probability of no KO, terminal worst-of below Strike, and KI triggered. Volatility and correlation use LSEG TR.TotalReturn1D total-return adjusted prices; raw-close fallback and forward fill are disabled.
       </div>
     </div>
   </section>
@@ -1512,7 +1512,7 @@ function attachEvents() {
 
 async function loadHspData() {
   try {
-    const dataUrl = "data/hsp_prices_20261026_767f45ced32d.json";
+    const dataUrl = "data/hsp_prices_20261026_4bf491002ec5.json";
     const res = await fetch(dataUrl, { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     HSP_DATA = await res.json();
@@ -1523,14 +1523,18 @@ async function loadHspData() {
       option.textContent = m.market + " - " + m.indexName;
       marketFilter.appendChild(option);
     });
+    var basis = HSP_DATA.priceBasis || {};
     document.getElementById("log").textContent =
-      "Data date: " + HSP_DATA.asOf + "; available RICs: " + HSP_DATA.count + ".";
+      "Data date: " + HSP_DATA.asOf + "; available RICs: " + HSP_DATA.count +
+      "; price basis: LSEG total-return adjusted (TR.TotalReturn1D; no raw-close fallback)." +
+      (basis.excludedShortOrMissing ?
+        " Excluded for missing/short adjusted history: " + basis.excludedShortOrMissing + "." : "");
     attachEvents();
     populateRicSelect();
     simulate();
   } catch (err) {
     document.getElementById("log").textContent =
-      "Cannot load data/hsp_prices_20261026_767f45ced32d.json. Use a static web server instead of opening file:// directly.\n" +
+      "Cannot load data/hsp_prices_20261026_4bf491002ec5.json. Use a static web server instead of opening file:// directly.\n" +
       (err.message || String(err));
   }
 }
